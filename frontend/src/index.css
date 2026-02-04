@@ -1,0 +1,39 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 248 250 252; /* slate-50 */
+    --foreground: 15 23 42;    /* slate-900 */
+  }
+
+  .dark {
+    --background: 15 23 42;    /* slate-900 */
+    --foreground: 248 250 252; /* slate-50 */
+  }
+}
+
+body {
+  @apply bg-background-light text-slate-900 dark:bg-background-dark dark:text-white transition-colors duration-300;
+  font-family: 'Inter', sans-serif;
+}
+
+/* Glassmorphism utility */
+.glass-panel {
+  @apply bg-white/70 dark:bg-slate-800/70 backdrop-blur-md border border-white/20 dark:border-slate-700/30;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  @apply bg-slate-300 dark:bg-slate-600 rounded-full;
+}
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-slate-400 dark:bg-slate-500;
+}
