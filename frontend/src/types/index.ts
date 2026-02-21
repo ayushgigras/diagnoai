@@ -3,13 +3,40 @@ export interface APIResponse<T> {
     status: number;
 }
 
+export interface XAIDetail {
+    radiological_finding: string;
+    visual_pattern: string;
+    visual_evidence: string;
+    clinical_context: string;
+    recommendation: string;
+    severity: 'normal' | 'low' | 'moderate' | 'high' | 'critical';
+    region: string;
+    confidence_pct: number;
+}
+
+export interface XRayFinding {
+    condition: string;
+    score: number;
+    severity: 'normal' | 'low' | 'moderate' | 'high' | 'critical';
+}
+
 export interface XRayResult {
     prediction: string;
     confidence: number;
     probabilities: Record<string, number>;
-    heatmap_base64?: string;
+    heatmap_b64?: string;
+    heatmap_base64?: string; // backward compat
+    region?: string;
+    findings?: XRayFinding[];
+    xai_details?: Record<string, XAIDetail>;
     explanation?: string;
     key_findings?: string[];
+    model_info?: {
+        name: string;
+        trained_on: string;
+        pathologies_count: number;
+        xai_method: string;
+    };
 }
 
 export interface LabParameter {
