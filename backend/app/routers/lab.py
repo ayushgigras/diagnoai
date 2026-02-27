@@ -11,45 +11,47 @@ async def analyze_manual(
     """
     Expects JSON:
     {
-        "test_type": "cbc",
         "values": { "wbc": 7000, ... }
     }
     """
-    test_type = data.get("test_type")
     values = data.get("values", {})
     
-    if not test_type or not values:
-        raise HTTPException(status_code=400, detail="Missing test_type or values")
+    if not values:
+        raise HTTPException(status_code=400, detail="Missing values")
         
-    return lab_service.analyze_lab_values(values, test_type)
+    return lab_service.analyze_lab_values(values)
 
 @router.post("/upload-file")
 async def upload_lab_file(
-    file: UploadFile = File(...),
-    test_type: str = Form(...)
+    file: UploadFile = File(...)
 ):
     # Process file with OCR
     # For mock, just pass path or filename
     
     # In real app, save file to temp dir
-    
-    result = ocr_service.extract_lab_values_from_file(file.filename, test_type)
+    file_bytes = await file.read()
+    result = await ocr_service.extract_lab_values_from_file(file_bytes, file.filename)
     return result
 
 @router.post("/analyze-from-file")
 async def analyze_from_file(
-    file: UploadFile = File(...),
-    test_type: str = Form(...)
+    file: UploadFile = File(...)
 ):
-    # 1. OCR extraction
-    ocr_result = ocr_service.extract_lab_values_from_file(file.filename, test_type)
+    # 1. Read file bytes
+    file_bytes = await file.read()
+    
+    # 2. OCR extraction
+    ocr_result = await ocr_service.extract_lab_values_from_file(file_bytes, file.filename)
     
     if ocr_result.get("status") != "success":
-        raise HTTPException(status_code=400, detail="OCR Failed")
+        raise HTTPException(status_code=400, detail="OCR Failed or no values matched.")
         
-    # 2. Analyze values
+    # 3. Analyze values
     extracted_values = ocr_result.get("extracted_data", {})
-    analysis = lab_service.analyze_lab_values(extracted_values, test_type)
+    analysis = lab_service.analyze_lab_values(extracted_values)
+    
+    # Optional: Attach extracted text/values back to analysis for frontend display
+    analysis["extracted_values"] = extracted_values
+    analysis["ocr_text_preview"] = ocr_result.get("ocr_text", "")[:500] 
     
     return analysis
-

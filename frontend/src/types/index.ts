@@ -57,7 +57,7 @@ export interface LabResult {
 }
 
 export interface OCRResult {
-    extracted_data: Record<string, any>;
+    extracted_data: Record<string, string | number>[];
     confidence: number;
     ocr_text: string;
     status: string;

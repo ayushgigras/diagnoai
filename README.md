@@ -29,6 +29,7 @@ diagnoai/
 ### Prerequisites
 - Node.js (v18+)
 - Python (3.8+)
+- Google Gemini API Key (stored in `backend/.env` as `GEMINI_API_KEY`)
 
 ### 1. Backend Setup
 
@@ -54,13 +55,10 @@ npm run dev
 ```
 Client will start at `http://localhost:5173`.
 
-## AI Capabilities (Mock/Placeholder)
+## AI Capabilities
 
-Currently, the system uses intelligent placeholders to demonstrate functionality:
-- **X-Ray Model**: Returns randomized but plausible predictions for demonstration.
-- **OCR Engine**: Simulates extraction delay and returns sample data for common test types (CBC, Metabolic).
-
-To connect real models, update `backend/app/services/xray_service.py` and `backend/app/services/ocr_service.py`.
+- **🧪 Lab Report Engine (Fully Integrated)**: Utilizes Google's `gemini-2.5-flash` Multimodal Vision API to perform zero-shot, dynamic table extraction from raw laboratory images/PDFs. It securely maps parameters to reference ranges and acts as a clinical assistant to provide plain-English interpretations.
+- **🔬 X-Ray Model**: Currently uses intelligent architectural placeholders. To connect real models, update `backend/app/services/xray_service.py`.
 
 ## License
 

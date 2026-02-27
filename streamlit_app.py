@@ -301,60 +301,48 @@ if "🫁 X-Ray Analysis" in page:
 # ══════════════════════════════════════════
 else:
     st.markdown("# 🧪 Lab Report Analysis")
-    st.markdown("Enter lab values manually to get AI-powered analysis and interpretation.")
+    st.markdown("Upload a Lab Report (PDF or Image) to get AI-powered extraction, analysis, and interpretation. We automatically detect and analyze a wide variety of lab panels.")
     st.divider()
 
-    test_type = st.selectbox(
-        "Select Test Type",
-        ["cbc", "lft", "kft"],
-        format_func=lambda x: {
-            "cbc": "CBC — Complete Blood Count",
-            "lft": "LFT — Liver Function Test",
-            "kft": "KFT — Kidney Function Test"
-        }[x]
-    )
+    col_upload, col_info = st.columns([2, 1])
 
-    st.markdown("### Enter Lab Values")
+    with col_upload:
+        uploaded_lab_file = st.file_uploader(
+            "Upload Lab Report (PDF, JPG, PNG)",
+            type=["pdf", "jpg", "jpeg", "png"],
+            key="lab_uploader"
+        )
+        
+    with col_info:
+        st.markdown("""
+        <div class="diag-card">
+        <b>✅ Universal Analysis:</b><br>
+        Just upload your report. The AI engine automatically detects test types and parses values for:<br>
+        - CBC Panel<br>
+        - Liver Function<br>
+        - Metabolic Panel<br>
+        - Lipid Panel<br>
+        - Thyroid Panel<br><br>
+        <b>⚙️ Engine:</b> EasyOCR + Pattern Matching
+        </div>
+        """, unsafe_allow_html=True)
 
-    # Dynamic input fields based on test type
-    CBC_FIELDS  = ["wbc", "rbc", "hemoglobin", "hematocrit", "platelets", "neutrophils", "lymphocytes"]
-    LFT_FIELDS  = ["bilirubin_total", "bilirubin_direct", "sgot_ast", "sgpt_alt", "alkaline_phosphatase", "albumin", "total_protein"]
-    KFT_FIELDS  = ["creatinine", "bun", "uric_acid", "sodium", "potassium", "chloride", "bicarbonate"]
 
-    FIELD_MAP = {"cbc": CBC_FIELDS, "lft": LFT_FIELDS, "kft": KFT_FIELDS}
-    fields = FIELD_MAP[test_type]
+    if uploaded_lab_file:
+        st.markdown("---")
+        
+        col_btn, _ = st.columns([1, 3])
+        with col_btn:
+             analyze_btn = st.button("🔍 Analyze Lab Report", use_container_width=True)
 
-    values = {}
-    cols_per_row = 3
-    for i in range(0, len(fields), cols_per_row):
-        row_fields = fields[i:i+cols_per_row]
-        row_cols   = st.columns(cols_per_row)
-        for col, field in zip(row_cols, row_fields):
-            with col:
-                val = st.number_input(
-                    field.replace("_", " ").title(),
-                    min_value=0.0,
-                    value=0.0,
-                    step=0.1,
-                    format="%.2f",
-                    key=f"lab_{field}"
-                )
-                values[field] = val
-
-    st.divider()
-    analyze_btn = st.button("🔍 Analyze Lab Values", use_container_width=False)
-
-    if analyze_btn:
-        filled = {k: v for k, v in values.items() if v > 0}
-        if not filled:
-            st.warning("⚠️ Please enter at least one lab value.")
-        else:
-            with st.spinner("Analyzing lab values..."):
+        if analyze_btn:
+            file_bytes = uploaded_lab_file.read()
+            with st.spinner("Extracting text via OCR and analyzing values universally..."):
                 try:
                     response = requests.post(
-                        f"{BACKEND_URL}/api/lab/analyze-manual",
-                        json={"test_type": test_type, "values": filled},
-                        timeout=30
+                        f"{BACKEND_URL}/api/lab/analyze-from-file",
+                        files={"file": (uploaded_lab_file.name, file_bytes, uploaded_lab_file.type)},
+                        timeout=60
                     )
                     response.raise_for_status()
                     result = response.json()
@@ -362,24 +350,67 @@ else:
                     st.error("❌ Cannot connect to backend. Make sure FastAPI is running.")
                     st.stop()
                 except Exception as e:
-                    st.error(f"❌ Analysis failed: {e}")
+                    # Try to get error detail from FastAPI
+                    err_detail = str(e)
+                    if hasattr(e, 'response') and e.response is not None:
+                        try:
+                            err_detail = e.response.json().get("detail", str(e))
+                        except:
+                            pass
+                    st.error(f"❌ Analysis failed: {err_detail}")
                     st.stop()
 
-            # Display results
-            overall = result.get("overall_status", "Unknown")
+            # Display Results
+            overall = result.get("assessment", "Unknown")
+            extracted = result.get("extracted_values", {})
+            
+            # --- Status Banner ---
             if "normal" in overall.lower():
-                st.success(f"✅ Overall: {overall}")
+                st.success(f"✅ **Overall Status:** {overall}")
             else:
-                st.warning(f"⚠️ Overall: {overall}")
+                st.warning(f"⚠️ **Overall Status:** {overall}")
+                
+            st.divider()
+            
+            # --- Extracted Values & Assessment Table ---
+            params = result.get("parameters", [])
+            if not params and not extracted:
+                 st.info("No numerical values could be confidently extracted.")
+            else:
+                 st.markdown("### 📊 Extracted Values & Assessment")
+                 
+                 # Display as grid
+                 cols_per_row = 3
+                 for i in range(0, len(params), cols_per_row):
+                     row_params = params[i:i+cols_per_row]
+                     cols = st.columns(cols_per_row)
+                     
+                     for col, p in zip(cols, row_params):
+                         with col:
+                             name = p.get("name", "Unknown")
+                             val = p.get("value", 0)
+                             ref = p.get("reference_range", "")
+                             status = p.get("status", "unknown").lower()
+                             
+                             if status == "normal":
+                                 st.metric(label=f"{name} (Ref: {ref})", value=val, delta="Normal", delta_color="normal")
+                             else:
+                                 st.metric(label=f"{name} (Ref: {ref})", value=val, delta="Abnormal", delta_color="inverse")
+             
+            st.divider()
 
-            findings_list = result.get("findings", [])
-            if findings_list:
-                st.markdown("### 📋 Findings")
-                for f in findings_list:
-                    st.markdown(f"- {f}")
-
-            recommendations = result.get("recommendations", [])
-            if recommendations:
+            # --- Clinical Interpretation & Recommendations ---
+            col_interp, col_rec = st.columns(2)
+            with col_interp:
+                st.markdown("### 🏥 Interpretation")
+                st.info(result.get("interpretation", "No interpretation provided."))
+                
+                # Show raw OCR preview
+                with st.expander("🛠️ View Raw OCR Text Prefix"):
+                    st.text(result.get("ocr_text_preview", ""))
+                    
+            with col_rec:
                 st.markdown("### 💊 Recommendations")
-                for r in recommendations:
-                    st.info(r)
+                recs = result.get("recommendations", [])
+                for r in recs:
+                    st.success(r)

@@ -1,65 +1,115 @@
-def analyze_lab_values(values: dict, test_type: str):
-    """Placeholder - replace with actual model"""
+def analyze_lab_values(values: list):
+    """Analyzes a dynamic list of lab parameters using Gemini."""
     
-    # Reference ranges
-    reference_ranges = {
-        "cbc": {
-            "wbc": (4000, 11000),
-            "rbc": (4.5, 5.5),
-            "hemoglobin": (13.5, 17.5),
-            "hematocrit": (38.8, 50),
-            "platelets": (150000, 450000),
-            "mcv": (80, 100)
-        },
-        "metabolic": {
-            "glucose": (70, 99),
-            "calcium": (8.5, 10.2),
-            "sodium": (135, 145),
-            "potassium": (3.5, 5.0)
-        }
-        # Add others as needed
-    }
+    import os
+    import json
+    import google.generativeai as genai
+    import traceback
     
-    current_ranges = reference_ranges.get(test_type, {})
-    
-    # Check if values are in range
-    all_normal = True
+    # Base structure
     parameters = []
     
-    for param, value in values.items():
-        param_key = param.lower()
-        if param_key in current_ranges:
-            min_val, max_val = current_ranges[param_key]
-            is_normal = min_val <= float(value) <= max_val
-            all_normal = all_normal and is_normal
-            
-            # Calculate percentage within range
-            if max_val != min_val:
-                percentage = ((float(value) - min_val) / (max_val - min_val)) * 100
-                percentage = max(0, min(100, percentage))
-            else:
-                percentage = 50
-            
-            parameters.append({
-                "name": param.upper(),
-                "value": value,
-                "reference_range": f"{min_val}-{max_val}",
-                "status": "normal" if is_normal else "abnormal",
-                "percentage": percentage
-            })
+    # Validate input is a list
+    if not isinstance(values, list):
+        if isinstance(values, dict):
+            # Fallback if old format is passed somehow
+             values = [{"parameter_name": k, "result_value": v, "unit": "", "reference_range": ""} for k, v in values.items()]
         else:
-             parameters.append({
-                "name": param.upper(),
-                "value": value,
-                "reference_range": "N/A",
-                "status": "unknown",
-                "percentage": 50
-            })
+             values = []
+             
+    for item in values:
+        parameters.append({
+            "name": item.get("parameter_name", "Unknown Parameter").upper(),
+            "value": item.get("result_value", 0),
+            "unit": item.get("unit", ""),
+            "reference_range": item.get("reference_range", "N/A"),
+            "status": "unknown",
+            "percentage": 50
+        })
+
+    prompt_data = {
+        "parameters": parameters
+    }
+
+    assessment = "Abnormal"
+    interpretation = "Unable to generate detailed clinical interpretation."
+    recommendations = ["Consult your healthcare provider."]
+
+    # Try to generate AI explanation using Gemini
+    try:
+        from dotenv import load_dotenv
+        load_dotenv()
+        
+        api_key = os.getenv("GEMINI_API_KEY")
+        if not api_key:
+             print("ERROR: GEMINI_API_KEY is completely missing from environment variables.")
+        else:
+            genai.configure(api_key=api_key)
+            model = genai.GenerativeModel("gemini-2.5-flash")
+            
+            prompt = f"""
+            Act as an expert medical AI assistant. Analyze the following laboratory test parameters.
+            For each parameter, look at the extracted `value` and its printed `reference_range`.
+            
+            Determine if each parameter is "normal", "abnormal", or "critical" based STRICTLY on its accompanied reference range.
+            Also provide a short, easy-to-understand clinical interpretation of the OVERALL results in 2-3 sentences. 
+            CRITICAL: The interpretation MUST be written in plain, patient-friendly English. Avoid dense medical jargon, but maintain a professional and reassuring tone. Do not use overly childish analogies (e.g. avoid saying 'tiny little buses'). Explain abnormal findings clearly and simply.
+            Finally, provide an array of 1-3 short, actionable recommendations (also in simple, non-technical English).
+            
+            Format your response STRICTLY as JSON with these exact keys:
+            {{
+              "overall_assessment": "Normal" | "Borderline" | "Abnormal" | "Critical",
+              "interpretation": "your text here",
+              "recommendations": ["rec1", "rec2"],
+              "assessed_parameters": [
+                  {{
+                      "name": "THE EXACT NAME FROM INPUT",
+                      "status": "normal" | "abnormal" | "critical",
+                      "percentage": 50 // Rough gauge of where it sits in the range (0 = min, 100 = max, or 0/100 if out of bounds)
+                  }}
+              ]
+            }}
+
+            Data:
+            {json.dumps(prompt_data, indent=2)}
+            """
+            
+            response = model.generate_content(prompt)
+            # Find JSON block in response
+            response_text = response.text.strip()
+            if response_text.startswith("```json"):
+                response_text = response_text[7:]
+            elif response_text.startswith("```"):
+                response_text = response_text[3:]
+            if response_text.endswith("```"):
+                response_text = response_text[:-3]
+                
+            ai_data = json.loads(response_text)
+            
+            if "overall_assessment" in ai_data:
+                assessment = ai_data["overall_assessment"]
+            if "interpretation" in ai_data:
+                interpretation = ai_data["interpretation"]
+            if "recommendations" in ai_data and isinstance(ai_data["recommendations"], list):
+                recommendations = ai_data["recommendations"]
+                
+            # Merge statuses back
+            if "assessed_parameters" in ai_data:
+                for ai_param in ai_data["assessed_parameters"]:
+                    for p in parameters:
+                        if p["name"] == ai_param.get("name"):
+                            p["status"] = ai_param.get("status", "unknown")
+                            p["percentage"] = ai_param.get("percentage", 50)
+                            break
+                            
+    except Exception as e:
+        print(f"Gemini API Error for Lab Explanation: {e}")
+        traceback.print_exc()
     
     return {
-        "assessment": "Normal" if all_normal else "Abnormal",
-        "confidence": 0.95 if all_normal else 0.87,
+        "assessment": assessment,
+        "confidence": 0.95 if assessment == "Normal" else 0.87,
         "parameters": parameters,
-        "interpretation": "All parameters within normal limits." if all_normal else "Some abnormalities detected.",
-        "recommendations": ["Routine checkup"] if all_normal else ["Consult a specialist"]
+        "interpretation": interpretation,
+        "recommendations": recommendations 
     }
