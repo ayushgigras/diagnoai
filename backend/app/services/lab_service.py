@@ -52,6 +52,13 @@ def analyze_lab_values(values: list):
             For each parameter, look at the extracted `value` and its printed `reference_range`.
             
             Determine if each parameter is "normal", "abnormal", or "critical" based STRICTLY on its accompanied reference range.
+            
+            Based on the individual parameters, determine the `overall_assessment` using these strict guidelines:
+            - "Normal": All parameters are strictly within their reference ranges.
+            - "Borderline": 1 or 2 parameters are slightly outside the normal range, but the deviation is minor and clinically insignificant in the overall healthy picture.
+            - "Abnormal": Multiple parameters are notably out of range, or a key parameter indicates a clear clinical abnormality.
+            - "Critical": One or more values are dangerously out of bounds and require immediate medical attention.
+
             Also provide a short, easy-to-understand clinical interpretation of the OVERALL results in 2-3 sentences. 
             CRITICAL: The interpretation MUST be written in plain, patient-friendly English. Avoid dense medical jargon, but maintain a professional and reassuring tone. Do not use overly childish analogies (e.g. avoid saying 'tiny little buses'). Explain abnormal findings clearly and simply.
             Finally, provide an array of 1-3 short, actionable recommendations (also in simple, non-technical English).
