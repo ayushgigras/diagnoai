@@ -1,8 +1,9 @@
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Body, Depends
+from sqlalchemy.orm import Session
 from app.services import lab_service, ocr_service
 from app.utils.upload import validate_and_save_upload
 from app.tasks import process_lab
-from app.database import SessionLocal
+from app.database import get_db
 from app.models.report import Report
 from app.models.user import User
 from app.dependencies import get_current_user
@@ -14,7 +15,8 @@ router = APIRouter()
 @router.post("/analyze-manual")
 async def analyze_manual(
     data: Dict[str, Any] = Body(...),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
 ):
     """
     Expects JSON:
@@ -31,26 +33,23 @@ async def analyze_manual(
     patient_id = data.get("patient_id")
     
     # Save report to database for history
-    db = SessionLocal()
-    try:
-        resolved_patient_id = resolve_patient_id(db, patient_id)
-        new_report = Report(
-            patient_id=resolved_patient_id,
-            doctor_id=current_user.id,
-            report_type="lab",
-            status="completed",
-            result_data=result
-        )
-        db.add(new_report)
-        db.commit()
-    finally:
-        db.close()
+    resolved_patient_id = resolve_patient_id(db, patient_id)
+    new_report = Report(
+        patient_id=resolved_patient_id,
+        doctor_id=current_user.id,
+        report_type="lab",
+        status="completed",
+        result_data=result
+    )
+    db.add(new_report)
+    db.commit()
     
     return result
 
 @router.post("/upload-file")
 async def upload_lab_file(
-    file: UploadFile = File(...)
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user)
 ):
     try:
         # 1. Validate and save file securely
@@ -71,14 +70,14 @@ async def upload_lab_file(
 async def analyze_from_file(
     file: UploadFile = File(...),
     patient_id: int | None = Form(None),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
 ):
     try:
         # 1. Validate and save file securely
         file_path = validate_and_save_upload(file, is_xray=False)
         
         # 2. Create a pending report in the database
-        db = SessionLocal()
         resolved_patient_id = resolve_patient_id(db, patient_id)
         new_report = Report(
             patient_id=resolved_patient_id,
@@ -96,7 +95,6 @@ async def analyze_from_file(
         # 4. Update the report with the task ID
         new_report.task_id = task.id
         db.commit()
-        db.close()
         
         return {
             "message": "Lab report analysis started in the background",

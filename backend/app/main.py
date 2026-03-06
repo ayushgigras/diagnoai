@@ -1,7 +1,21 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+from starlette.middleware.trustedhost import TrustedHostMiddleware
+import os
+
 from app.config import settings
 from app.routers import xray, lab, auth, tasks, reports
+
+# --------------- Rate Limiter ---------------
+ratelimit_enabled = os.getenv("RATELIMIT_ENABLED", "true").lower() != "false"
+limiter = Limiter(
+    key_func=get_remote_address, 
+    default_limits=["60/minute"] if ratelimit_enabled else [],
+    enabled=ratelimit_enabled
+)
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -9,25 +23,52 @@ app = FastAPI(
     version=settings.PROJECT_VERSION,
 )
 
-# CORS Middleware
+app.state.limiter = limiter
+if ratelimit_enabled:
+    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+# --------------- Security Headers Middleware ---------------
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next):
+    response: Response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+    response.headers["Content-Security-Policy"] = "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'"
+    return response
+
+# --------------- CORS Middleware ---------------
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.BACKEND_CORS_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "X-CSRF-Token"],
+    expose_headers=["X-CSRF-Token"],
 )
 
-# Include Routers
+# --------------- Trusted Host Middleware ---------------
+app.add_middleware(
+    TrustedHostMiddleware,
+    allowed_hosts=settings.ALLOWED_HOSTS,
+)
+
+# --------------- Routers ---------------
 app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
 app.include_router(xray.router, prefix="/api/xray", tags=["X-Ray Analysis"])
 app.include_router(lab.router, prefix="/api/lab", tags=["Lab Analysis"])
 app.include_router(tasks.router, prefix="/api/tasks", tags=["Background Tasks"])
 app.include_router(reports.router, prefix="/api/reports", tags=["Reports"])
 
+
 @app.get("/api/health")
-async def health_check():
+@limiter.limit("10/minute")
+async def health_check(request: Request):
     return {"status": "healthy", "project": settings.PROJECT_NAME}
+
 
 @app.get("/")
 async def root():

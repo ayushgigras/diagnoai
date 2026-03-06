@@ -1,8 +1,9 @@
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Depends
+from sqlalchemy.orm import Session
 from app.services import xray_service
 from app.utils.upload import validate_and_save_upload
 from app.tasks import process_xray
-from app.database import SessionLocal
+from app.database import get_db
 from app.models.report import Report
 from app.models.user import User
 from app.dependencies import get_current_user
@@ -18,14 +19,14 @@ async def analyze_xray(
     file: UploadFile = File(...),
     xray_type: str = Form(...),
     patient_id: int | None = Form(None),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
 ):
     try:
         # 1. Validate and save file securely
         file_path = validate_and_save_upload(file, is_xray=True)
         
         # 2. Create a pending report in the database
-        db = SessionLocal()
         resolved_patient_id = resolve_patient_id(db, patient_id)
         new_report = Report(
             patient_id=resolved_patient_id,
@@ -38,14 +39,12 @@ async def analyze_xray(
         db.refresh(new_report)
         
         # 3. Enqueue the Celery task
-        # Need to extract ID before closing DB
         report_id = new_report.id
         task = process_xray.delay(file_path, xray_type, report_id)
         
         # 4. Update the report with the task ID
         new_report.task_id = task.id
         db.commit()
-        db.close()
         
         # Return immediately so the client isn't blocked by inference
         return {
