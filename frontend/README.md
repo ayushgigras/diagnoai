@@ -4,12 +4,13 @@ Modern React application for the DiagnoAI healthcare platform.
 
 ## Features
 
-- **X-Ray Analysis Interface**: Drag & drop upload, visual results with heatmaps (mock).
+- **X-Ray Analysis Interface**: Drag & drop upload with async task polling and explainable results.
 - **Lab Analysis Interface**: 
-    - Manual parameter entry
-    - PDF/Image upload with OCR extraction (Mock)
+   - Manual parameter entry
+   - PDF/Image upload with Gemini OCR extraction
     - Review and edit extracted data
-- **Modern UI**: Built with Tailwind CSS, Framer Motion, and Glassmorphism design.
+- **History View**: Shows report status and summarized result previews.
+- **Modern UI**: Built with Tailwind CSS and Framer Motion.
 
 ## Tech Stack
 
@@ -42,4 +43,6 @@ Modern React application for the DiagnoAI healthcare platform.
 
 ## Configuration
 
-- API Base URL is configured in `src/services/api.ts`. Default: `http://localhost:8000/api`.
+- API base URL is configured in `src/services/api.ts`.
+- Default backend URL: `http://127.0.0.1:8000/api`.
+- Ensure backend API and Celery worker are running before using analysis pages.

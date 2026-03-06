@@ -1,17 +1,22 @@
-import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Activity, Menu, X } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useState } from 'react';
+import useAuthStore from '../../store/useAuthStore';
 
 const Navbar = () => {
     const location = useLocation();
     const [isOpen, setIsOpen] = useState(false);
+    const { isAuthenticated, logout, user } = useAuthStore();
 
     const navLinks = [
         { name: 'Home', path: '/' },
-        { name: 'X-Ray Analysis', path: '/xray' },
-        { name: 'Lab Analysis', path: '/lab' },
+        // Only show these in the mapped links if authenticated, or we can handle them separately
+        ...(isAuthenticated ? [
+            { name: 'X-Ray Analysis', path: '/xray' },
+            { name: 'Lab Analysis', path: '/lab' },
+            { name: 'History', path: '/history' },
+        ] : []),
         { name: 'About', path: '/about' },
     ];
 
@@ -45,6 +50,37 @@ const Navbar = () => {
                         </div>
                     </div>
 
+                    <div className="hidden md:flex items-center space-x-4">
+                        {isAuthenticated ? (
+                            <div className="flex items-center space-x-4">
+                                <span className="text-sm text-slate-600 dark:text-slate-300">
+                                    {user?.full_name}
+                                </span>
+                                <button
+                                    onClick={logout}
+                                    className="px-4 py-2 text-sm font-medium text-white bg-red-500 rounded-md hover:bg-red-600 transition-colors"
+                                >
+                                    Log out
+                                </button>
+                            </div>
+                        ) : (
+                            <div className="flex items-center space-x-2">
+                                <Link
+                                    to="/login"
+                                    className="px-4 py-2 text-sm font-medium text-primary hover:bg-primary/10 rounded-md transition-colors"
+                                >
+                                    Sign in
+                                </Link>
+                                <Link
+                                    to="/register"
+                                    className="px-4 py-2 text-sm font-medium text-white bg-primary rounded-md hover:bg-primary/90 transition-colors"
+                                >
+                                    Get Started
+                                </Link>
+                            </div>
+                        )}
+                    </div>
+
                     <div className="md:hidden">
                         <button
                             onClick={() => setIsOpen(!isOpen)}
@@ -75,6 +111,34 @@ const Navbar = () => {
                                 {link.name}
                             </Link>
                         ))}
+                        {isAuthenticated ? (
+                            <button
+                                onClick={() => {
+                                    logout();
+                                    setIsOpen(false);
+                                }}
+                                className="block w-full text-left px-3 py-2 rounded-md text-base font-medium text-red-500 hover:bg-red-50 dark:hover:bg-red-900/10"
+                            >
+                                Log out
+                            </button>
+                        ) : (
+                            <>
+                                <Link
+                                    to="/login"
+                                    onClick={() => setIsOpen(false)}
+                                    className="block px-3 py-2 rounded-md text-base font-medium text-slate-600 dark:text-slate-300 hover:text-primary hover:bg-slate-100 dark:hover:bg-slate-800"
+                                >
+                                    Sign in
+                                </Link>
+                                <Link
+                                    to="/register"
+                                    onClick={() => setIsOpen(false)}
+                                    className="block px-3 py-2 rounded-md text-base font-medium text-primary hover:bg-primary/10"
+                                >
+                                    Get Started
+                                </Link>
+                            </>
+                        )}
                     </div>
                 </div>
             )}

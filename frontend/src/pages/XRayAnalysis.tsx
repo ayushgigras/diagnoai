@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { analyzeXRay } from '../services/xrayService';
+import { analyzeXRay, checkTaskStatus } from '../services/xrayService';
 import type { XRayResult } from '../types';
 
 import XRayTypeSelector from '../components/xray/XRayTypeSelector';
@@ -31,12 +31,36 @@ const XRayAnalysis = () => {
         setError(null);
 
         try {
-            const data = await analyzeXRay(file, selectedType);
-            setResult(data);
+            // 1. Trigger the background task
+            const { task_id } = await analyzeXRay(file, selectedType);
+
+            // 2. Poll the status endpoints
+            pollTaskStatus(task_id);
         } catch (err) {
-            setError("Analysis failed. Please try again.");
+            setError("Failed to start analysis. Please check your connection.");
             console.error(err);
-        } finally {
+            setIsAnalyzing(false);
+        }
+    };
+
+    const pollTaskStatus = async (taskId: string) => {
+        try {
+            const data = await checkTaskStatus(taskId);
+
+            if (data.status === 'SUCCESS') {
+                // Task is completed, data.result is now the XRayResult 
+                setResult(data.result);
+                setIsAnalyzing(false);
+            } else if (data.status === 'FAILURE') {
+                setError(data.result || "Analysis failed during processing.");
+                setIsAnalyzing(false);
+            } else {
+                // Task is still PENDING or STARTED, poll again in 2 seconds
+                setTimeout(() => pollTaskStatus(taskId), 2000);
+            }
+        } catch (err) {
+            setError("Failed to check task status.");
+            console.error(err);
             setIsAnalyzing(false);
         }
     };

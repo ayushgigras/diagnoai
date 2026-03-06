@@ -1,7 +1,8 @@
 fastapi>=0.109.0
 uvicorn>=0.27.0
 python-multipart>=0.0.6
-# fastapi-cors removed (deprecated, part of fastapi core)
+
+# AI / ML
 torch
 torchvision
 torchxrayvision>=1.0.1
@@ -13,8 +14,28 @@ opencv-python-headless>=4.9.0.80
 Pillow>=10.2.0
 pandas>=2.2.0
 numpy>=1.26.3
+
+# Config / Async / API integrations
 python-dotenv>=1.0.1
 aiofiles>=23.2.1
 pydantic-settings>=2.1.0
 streamlit>=1.54.0
 google-generativeai>=0.4.0
+
+# Database / Migrations
+sqlalchemy>=2.0.25
+psycopg2-binary>=2.9.9
+alembic>=1.13.1
+
+# Auth / Security
+passlib[bcrypt]>=1.7.4
+python-jose[cryptography]>=3.3.0
+email-validator>=2.1.0
+
+# Background jobs
+celery>=5.3.6
+redis>=5.0.1
+
+# Optional testing utilities used by existing scripts
+requests>=2.31.0
+pytest>=8.0.0

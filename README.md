@@ -20,7 +20,7 @@ diagnoai/
 │   ├── src/pages      # Main Pages (XRay, Lab, Home)
 │   └── src/services   # API integration
 └── backend/           # FastAPI + Python application
-    ├── app/services   # Business logic (ML/OCR Mocks)
+    ├── app/services   # Business logic (X-Ray inference + Gemini OCR/analysis)
     └── app/routers    # API Endpoints
 ```
 
@@ -28,10 +28,16 @@ diagnoai/
 
 ### Prerequisites
 - Node.js (v18+)
-- Python (3.8+)
-- Google Gemini API Key (stored in `backend/.env` as `GEMINI_API_KEY`)
+- Python (3.10+ recommended)
+- Docker (recommended for PostgreSQL + Redis)
 
-### 1. Backend Setup
+### 1) Start Infrastructure (PostgreSQL + Redis)
+
+```bash
+docker compose up -d
+```
+
+### 2) Backend Setup
 
 ```bash
 cd backend
@@ -42,18 +48,47 @@ venv\Scripts\activate
 source venv/bin/activate
 
 pip install -r requirements.txt
+```
+
+Create `backend/.env`:
+
+```env
+JWT_SECRET_KEY=your-long-random-secret
+GEMINI_API_KEY=your-gemini-api-key
+DATABASE_URL=postgresql://postgres:postgrespassword@localhost:5432/diagnoai
+CELERY_BROKER_URL=redis://localhost:6379/0
+CELERY_RESULT_BACKEND=redis://localhost:6379/1
+```
+
+Run API:
+
+```bash
 uvicorn app.main:app --reload
 ```
-Server will start at `http://localhost:8000`. API Docs at `http://localhost:8000/docs`.
 
-### 2. Frontend Setup
+Run worker in a second terminal:
+
+```bash
+celery -A app.celery_app.celery_app worker --loglevel=info
+```
+
+Server runs at `http://localhost:8000` and docs at `http://localhost:8000/docs`.
+
+### 3) Frontend Setup
 
 ```bash
 cd frontend
 npm install
 npm run dev
 ```
-Client will start at `http://localhost:5173`.
+
+Client runs at `http://localhost:5173`.
+
+## Notes
+
+- Auth is JWT-based and `JWT_SECRET_KEY` is now required.
+- Background analysis (`/api/xray/analyze`, `/api/lab/analyze-from-file`) uses Celery + Redis.
+- `patient_id` can be passed in analyze requests; if omitted, backend resolves a fallback patient.
 
 ## AI Capabilities
 

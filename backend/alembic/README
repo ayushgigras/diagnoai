@@ -1,0 +1,17 @@
+# Alembic Migrations
+
+This directory contains database migration configuration and revision scripts for DiagnoAI backend.
+
+## Common Commands
+
+- Apply latest migrations:
+  - `alembic upgrade head`
+- Create a new migration from model changes:
+  - `alembic revision --autogenerate -m "your message"`
+- Roll back one revision:
+  - `alembic downgrade -1`
+
+## Notes
+
+- Ensure `DATABASE_URL` is set in `backend/.env` before running migrations.
+- Revision files are stored in `backend/alembic/versions/`.

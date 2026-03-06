@@ -5,6 +5,13 @@ frontend/node_modules/
 .env
 .DS_Store
 
+# Uploads & Temp Files
+backend/uploads/
+backend/temp_uploads/
+backend/*.jpg
+backend/*.jpeg
+backend/*.png
+
 # Build Artifacts
 frontend/dist/
 frontend/build/
