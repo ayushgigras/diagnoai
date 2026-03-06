@@ -1,8 +1,6 @@
 # DiagnoAI - Intelligent Healthcare Diagnostics
 
-DiagnoAI is a full-stack AI-powered diagnostic system designed to assist healthcare professionals in analyzing medical imaging (X-Rays) and laboratory reports.
-
-![DiagnoAI](https://via.placeholder.com/800x400?text=DiagnoAI+Dashboard)
+DiagnoAI is a full-stack AI-powered diagnostic system designed to assist healthcare professionals in analyzing medical imaging (X-Rays) and laboratory reports. It ships with two frontends — a **React + Vite SPA** for production use and a **Streamlit** app for rapid prototyping and demos.
 
 ## Features
 
@@ -36,7 +34,8 @@ DiagnoAI is a full-stack AI-powered diagnostic system designed to assist healthc
 
 | Layer             | Technology                                |
 |-------------------|-------------------------------------------|
-| Frontend          | React 18, TypeScript, Vite, Tailwind CSS  |
+| Frontend (SPA)    | React 18, TypeScript, Vite, Tailwind CSS  |
+| Frontend (Demo)   | Streamlit                                 |
 | Backend API       | FastAPI, Pydantic, SQLAlchemy              |
 | Authentication    | JWT (python-jose), bcrypt (passlib)       |
 | Database          | PostgreSQL, Alembic migrations            |
@@ -73,7 +72,8 @@ diagnoai/
 │   ├── tests/                # pytest test suites
 │   ├── alembic/              # Database migrations
 │   └── requirements.txt
-└── docker-compose.yml        # PostgreSQL + Redis infrastructure
+├── streamlit_app.py              # Streamlit demo frontend
+└── docker-compose.yml            # PostgreSQL + Redis infrastructure
 ```
 
 ## Quick Start
@@ -142,6 +142,14 @@ npm run dev
 ```
 
 Client runs at `http://localhost:5173`.
+
+### 4) Streamlit Frontend (Alternative)
+
+```bash
+streamlit run streamlit_app.py
+```
+
+Opens at `http://localhost:8501`. Ensure the backend API server is running on port 8000.
 
 ## API Endpoints
 

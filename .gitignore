@@ -27,5 +27,12 @@ frontend/build/
 *.log
 npm-debug.log*
 
+# SQLite databases
+*.db
+*.sqlite3
+
+# Study / personal guides
+TEAM_GUIDE.md
+
 # OS
 Thumbs.db
