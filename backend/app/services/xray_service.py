@@ -450,10 +450,11 @@ async def predict_xray(image_bytes: bytes, xray_type: str) -> dict:
     # ── 3. Inference ──
     with torch.no_grad():
         raw_output = model(tensor)  # [1, 18]
-        scores = torch.sigmoid(raw_output)[0].cpu().numpy()  # [18]
+        scores = raw_output[0].cpu().numpy()  # [18] ← CHANGED
 
     pathologies = model.pathologies
     prob_dict = {p: float(s) for p, s in zip(pathologies, scores)}
+
 
     # ── 4. Adaptive detection ─────────────────────────────────────────────────
     # Strategy: A pathology is flagged only if BOTH:
@@ -483,17 +484,17 @@ async def predict_xray(image_bytes: bytes, xray_type: str) -> dict:
     print(f"[DiagnoAI] top-3 scores: {sorted(zip(pathologies, scores), key=lambda x: -x[1])[:3]}")
 
     # If all 18 scores are too tightly clustered, the model is uncertain → Normal
-    if score_std < 0.04:
+    if score_std < 0.01:
         detected_findings = []
-        print(f"[DiagnoAI] std={score_std:.4f} < 0.04 → tight cluster → NORMAL")
+        print(f"[DiagnoAI] std={score_std:.4f} < 0.01 → tight cluster → NORMAL")
     else:
-        z_threshold = score_mean + 2.0 * score_std   # raised from 1.5 → 2.0
+        z_threshold = score_mean + 0.85 * score_std   # lowered from 1.0 to 0.85
         print(f"[DiagnoAI] z_threshold={z_threshold:.4f}")
 
         detected_findings = [
             (p, float(s)) for p, s in zip(pathologies, score_arr)
             if float(s) >= z_threshold      # statistically anomalous for this image
-            and float(s) >= 0.60            # raised floor: model must be clearly positive (>60%)
+            and float(s) >= 0.40            # lowered floor: model must lean positive (>40%)
         ]
         print(f"[DiagnoAI] detected_findings={detected_findings}")
 
