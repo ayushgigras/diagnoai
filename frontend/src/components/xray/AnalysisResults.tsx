@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import type { XRayResult, XAIDetail } from '../../types';
 import { Card, CardHeader, CardTitle, CardContent } from '../common/Card';
 import {

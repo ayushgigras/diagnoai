@@ -4,12 +4,13 @@ DiagnoAI is a full-stack AI-powered diagnostic system designed to assist healthc
 
 ## Features
 
-- **🔬 X-Ray Analysis**: Automated detection of conditions like Pneumonia, COVID-19, and Fractures from X-ray images using deep learning (TorchXRayVision).
+- **🔬 X-Ray Analysis**: Automated detection of conditions like Pneumonia, COVID-19, and Fractures from X-ray images using deep learning (TorchXRayVision), processing synchronously for immediate results.
 - **🧪 Lab Report Analysis**: Intelligent parsing of PDF/Image lab reports using OCR (Google Gemini Vision), with automatic interpretation of values against reference ranges.
 - **📝 Intelligent Insights**: Confidence scores, probability distributions, and clinical recommendations.
-- **🔒 Secure by Design**: JWT authentication, bcrypt password hashing, rate limiting, security headers, input validation, and role-based access control.
+- **🔒 Secure by Design**: JWT authentication, CSRF protection, bcrypt password hashing, rate limiting, security headers, input validation, and role-based access control.
 - **📊 Report History**: Persistent report storage with per-user history via PostgreSQL.
-- **⚡ Background Processing**: Long-running AI inference runs asynchronously via Celery + Redis.
+- **⚡ Background Processing**: Long-running Lab OCR tasks run asynchronously via Celery + Redis.
+- **🔔 Real-time Notifications**: WebSockets-based real-time updates for background tasks and system alerts.
 
 ## Architecture
 
@@ -17,27 +18,27 @@ DiagnoAI is a full-stack AI-powered diagnostic system designed to assist healthc
 ┌─────────────┐       ┌──────────────┐       ┌──────────┐
 │  React SPA  │──────►│  FastAPI      │──────►│PostgreSQL│
 │  (Vite+TS)  │  JWT  │  REST API     │  ORM  │          │
-└─────────────┘       └──────┬───────┘       └──────────┘
-                             │
-                     ┌───────▼───────┐       ┌──────────┐
-                     │  Celery       │──────►│  Redis   │
-                     │  Workers      │       │  Broker  │
-                     └───────┬───────┘       └──────────┘
-                             │
-                ┌────────────┼────────────┐
-                ▼                         ▼
-        ┌──────────────┐        ┌──────────────┐
-        │TorchXRayVision│       │ Google Gemini │
-        │  (X-Ray AI)   │       │ (Lab OCR/AI)  │
-        └──────────────┘        └──────────────┘
+└──────┬──────┘       └──────┬──┬────┘       └──────────┘
+       │        WebSocket    │  │
+       └─────────────────────┘  │
+                                │
+                        ┌───────▼───────┐       ┌──────────┐
+                        │  Celery       │──────►│  Redis   │
+                        │  Workers      │       │  Broker  │
+                        └───────┬───────┘       └──────────┘
+                                │
+                       ┌────────▼─────┐        ┌──────────────┐
+                       │ Google Gemini│        │TorchXRayVision│
+                       │ (Lab OCR/AI) │        │  (X-Ray AI)   │
+                       └──────────────┘        └──────────────┘
 ```
 
 | Layer             | Technology                                |
 |-------------------|-------------------------------------------|
 | Frontend (SPA)    | React 18, TypeScript, Vite, Tailwind CSS  |
 | Frontend (Demo)   | Streamlit                                 |
-| Backend API       | FastAPI, Pydantic, SQLAlchemy              |
-| Authentication    | JWT (python-jose), bcrypt (passlib)       |
+| Backend API       | FastAPI, Pydantic, SQLAlchemy, WebSockets  |
+| Authentication    | JWT (python-jose), bcrypt (passlib), CSRF |
 | Database          | PostgreSQL, Alembic migrations            |
 | Task Queue        | Celery + Redis                            |
 | AI / ML           | PyTorch, TorchXRayVision, Google Gemini   |
@@ -50,30 +51,30 @@ diagnoai/
 ├── frontend/                 # React + Vite + TypeScript application
 │   ├── src/
 │   │   ├── components/       # Reusable UI components
-│   │   │   ├── common/       # Navbar, Footer, ProtectedRoute, Button, Card
-│   │   │   ├── lab/          # FileUploader, ExtractedDataPreview, LabResults
-│   │   │   └── xray/         # ImageUploader, XRayTypeSelector, AnalysisResults
-│   │   ├── pages/            # Route pages (Home, Login, Register, XRay, Lab, History, About)
-│   │   ├── services/         # Axios API layer
-│   │   ├── store/            # Zustand auth store
+│   │   │   ├── common/       # Navbar, Footer, NotificationsHelper, etc.
+│   │   │   ├── lab/          # FileUploader, LabResults
+│   │   │   └── xray/         # ImageUploader, AnalysisResults
+│   │   ├── pages/            # Route pages (Home, Login, XRay, Lab, History, Profile)
+│   │   ├── services/         # Axios API layer & WebSockets
+│   │   ├── store/            # Zustand auth and UI store
 │   │   └── __tests__/        # Vitest test suites
 │   └── package.json
 ├── backend/                  # FastAPI + Python application
 │   ├── app/
-│   │   ├── main.py           # App entry, middleware, security headers
+│   │   ├── main.py           # App entry, middleware, CSRF
 │   │   ├── config.py         # Pydantic settings
 │   │   ├── database.py       # SQLAlchemy engine + session
-│   │   ├── dependencies.py   # Auth dependencies (JWT decode, role checks)
-│   │   ├── models/           # SQLAlchemy ORM models (User, Patient, Report)
-│   │   ├── schemas/          # Pydantic request/response schemas
-│   │   ├── routers/          # API route handlers
-│   │   ├── services/         # Business logic (xray_service, lab_service, ocr_service)
-│   │   └── utils/            # Security, file upload, PDF generation
+│   │   ├── dependencies.py   # Auth dependencies
+│   │   ├── models/           # SQLAlchemy ORM models
+│   │   ├── schemas/          # Pydantic schemas
+│   │   ├── routers/          # API route handlers (incl. ws.py)
+│   │   ├── services/         # Business logic
+│   │   └── utils/            # Utilities
 │   ├── tests/                # pytest test suites
 │   ├── alembic/              # Database migrations
 │   └── requirements.txt
-├── streamlit_app.py              # Streamlit demo frontend
-└── docker-compose.yml            # PostgreSQL + Redis infrastructure
+├── streamlit_app.py          # Streamlit demo frontend
+└── docker-compose.yml        # PostgreSQL + Redis infrastructure
 ```
 
 ## Quick Start
@@ -107,7 +108,7 @@ Create `backend/.env`:
 ```env
 JWT_SECRET_KEY=your-long-random-secret
 GEMINI_API_KEY=your-gemini-api-key
-DATABASE_URL=postgresql://postgres:postgrespassword@localhost:5432/diagnoai
+DATABASE_URL=postgresql://postgres:your_strong_password@localhost:5432/diagnoai
 CELERY_BROKER_URL=redis://localhost:6379/0
 CELERY_RESULT_BACKEND=redis://localhost:6379/1
 APP_ENV=development
@@ -158,12 +159,13 @@ Opens at `http://localhost:8501`. Ensure the backend API server is running on po
 | POST   | `/api/auth/register`      | No   | Register a new user                  |
 | POST   | `/api/auth/login`         | No   | Login and receive JWT token          |
 | GET    | `/api/auth/me`            | Yes  | Get current user profile             |
-| POST   | `/api/xray/analyze`       | Yes  | Upload X-ray for background analysis |
+| POST   | `/api/xray/analyze`       | Yes  | Upload X-ray for synchronous analysis|
 | POST   | `/api/lab/analyze-manual` | Yes  | Analyze manually entered lab values  |
 | POST   | `/api/lab/upload-file`    | Yes  | Upload lab report for OCR extraction |
-| POST   | `/api/lab/analyze-from-file`| Yes | Upload & analyze lab report end-to-end|
+| POST   | `/api/lab/analyze-from-file`| Yes| Upload & analyze lab report end-to-end|
 | GET    | `/api/tasks/status/{id}`  | Yes  | Check background task status         |
 | GET    | `/api/reports/history`    | Yes  | Get authenticated user's report history|
+| WS     | `/api/ws/{client_id}`     | No*  | Connect to WebSocket notifications   |
 | GET    | `/api/health`             | No   | Health check                         |
 
 ## Security
@@ -174,6 +176,7 @@ DiagnoAI implements the following security best practices:
 |-----------------------------|---------------------------------------------------|
 | **Authentication**          | JWT Bearer tokens (OAuth2PasswordBearer)           |
 | **Authorization**           | Role-based access control (doctor, admin)          |
+| **CSRF Protection**         | Custom middleware verifying tokens and cookies     |
 | **Password Hashing**        | bcrypt via passlib                                 |
 | **Password Validation**     | Min 8 chars, uppercase, lowercase, digit, special  |
 | **Rate Limiting**           | slowapi — 60 req/min global, 5/min register, 10/min login |
@@ -217,7 +220,7 @@ Tests cover:
 ## Notes
 
 - Auth is JWT-based and `JWT_SECRET_KEY` is required (app will not start in production without it).
-- Background analysis (`/api/xray/analyze`, `/api/lab/analyze-from-file`) uses Celery + Redis.
+- Background analysis (`/api/lab/analyze-from-file`) uses Celery + Redis. X-ray analysis operates synchronously.
 - `patient_id` can be passed in analyze requests; if omitted, backend resolves a fallback patient.
 
 ## AI Capabilities

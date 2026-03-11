@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { analyzeXRay, checkTaskStatus } from '../services/xrayService';
+import { analyzeXRay } from '../services/xrayService';
 import type { XRayResult } from '../types';
 
 import XRayTypeSelector from '../components/xray/XRayTypeSelector';
@@ -31,36 +31,14 @@ const XRayAnalysis = () => {
         setError(null);
 
         try {
-            // 1. Trigger the background task
-            const { task_id } = await analyzeXRay(file, selectedType);
-
-            // 2. Poll the status endpoints
-            pollTaskStatus(task_id);
-        } catch (err) {
-            setError("Failed to start analysis. Please check your connection.");
+            // Run analysis directly — backend processes synchronously and returns result
+            const result = await analyzeXRay(file, selectedType);
+            setResult(result);
+        } catch (err: any) {
+            const detail = err?.response?.data?.detail;
+            setError(detail || "Analysis failed. Please check your connection and try again.");
             console.error(err);
-            setIsAnalyzing(false);
-        }
-    };
-
-    const pollTaskStatus = async (taskId: string) => {
-        try {
-            const data = await checkTaskStatus(taskId);
-
-            if (data.status === 'SUCCESS') {
-                // Task is completed, data.result is now the XRayResult 
-                setResult(data.result);
-                setIsAnalyzing(false);
-            } else if (data.status === 'FAILURE') {
-                setError(data.result || "Analysis failed during processing.");
-                setIsAnalyzing(false);
-            } else {
-                // Task is still PENDING or STARTED, poll again in 2 seconds
-                setTimeout(() => pollTaskStatus(taskId), 2000);
-            }
-        } catch (err) {
-            setError("Failed to check task status.");
-            console.error(err);
+        } finally {
             setIsAnalyzing(false);
         }
     };
@@ -136,8 +114,14 @@ const XRayAnalysis = () => {
                                         </Button>
                                     </div>
 
+                                    {isAnalyzing && (
+                                        <div className="text-center text-slate-500 text-sm mt-2 animate-pulse">
+                                            Running DenseNet121 inference — this may take 30–60 seconds on first use while the model loads.
+                                        </div>
+                                    )}
+
                                     {error && (
-                                        <div className="text-center text-red-500 text-sm mt-2 font-medium animate-pulse">
+                                        <div className="text-center text-red-500 text-sm mt-2 font-medium">
                                             {error}
                                         </div>
                                     )}

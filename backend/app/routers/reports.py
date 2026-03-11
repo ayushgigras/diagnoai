@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import List
 
@@ -23,3 +23,21 @@ def get_my_reports(
         .all()
     )
     return reports
+
+@router.delete("/{report_id}")
+def delete_report(
+    report_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Delete a specific report by ID."""
+    report = db.query(Report).filter(Report.id == report_id).first()
+    if not report:
+        raise HTTPException(status_code=404, detail="Report not found")
+        
+    if report.doctor_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized to delete this report")
+        
+    db.delete(report)
+    db.commit()
+    return {"message": "Report deleted successfully"}

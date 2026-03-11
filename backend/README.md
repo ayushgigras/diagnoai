@@ -15,7 +15,7 @@ Create `backend/.env` with:
 ```env
 JWT_SECRET_KEY=your-long-random-secret
 GEMINI_API_KEY=your-gemini-api-key
-DATABASE_URL=postgresql://postgres:postgrespassword@localhost:5432/diagnoai
+DATABASE_URL=postgresql://postgres:your_strong_password@localhost:5432/diagnoai
 CELERY_BROKER_URL=redis://localhost:6379/0
 CELERY_RESULT_BACKEND=redis://localhost:6379/1
 ```
@@ -58,6 +58,7 @@ Once running, visit `http://127.0.0.1:8000/docs`.
 
 ## Endpoint Notes
 
-- `POST /api/xray/analyze` accepts multipart fields: `file`, `xray_type`, optional `patient_id`.
-- `POST /api/lab/analyze-from-file` accepts multipart fields: `file`, optional `patient_id`.
+- `POST /api/xray/analyze` accepts multipart fields: `file`, `xray_type`, optional `patient_id`. Runs synchronously.
+- `POST /api/lab/analyze-from-file` accepts multipart fields: `file`, optional `patient_id`. Runs via background tasks.
 - `POST /api/lab/analyze-manual` accepts JSON body with `values` and optional `patient_id`.
+- `WS /api/ws/{client_id}` connects a client for real-time WebSocket notifications.

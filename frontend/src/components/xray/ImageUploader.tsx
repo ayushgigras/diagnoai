@@ -1,6 +1,6 @@
-import React, { useCallback } from 'react';
+import { useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
-import { UploadCloud, Image as ImageIcon } from 'lucide-react';
+import { UploadCloud } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { Card } from '../common/Card';
 

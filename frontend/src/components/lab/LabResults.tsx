@@ -1,10 +1,8 @@
-import React from 'react';
 import type { LabResult, LabParameter } from '../../types';
 
 import { Card, CardHeader, CardTitle, CardContent } from '../common/Card';
 import { CheckCircle2, AlertCircle, HelpCircle } from 'lucide-react';
 import { cn } from '../../lib/utils';
-import { motion } from 'framer-motion';
 
 interface LabResultsProps {
     result: LabResult;

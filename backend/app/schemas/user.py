@@ -8,6 +8,10 @@ class UserBase(BaseModel):
     full_name: Optional[str] = None
     role: Optional[str] = "doctor"
 
+class UserUpdate(BaseModel):
+    full_name: Optional[str] = None
+    email: Optional[EmailStr] = None
+
 class UserCreate(UserBase):
     password: str
 

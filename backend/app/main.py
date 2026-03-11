@@ -5,9 +5,10 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 import os
+import secrets
 
 from app.config import settings
-from app.routers import xray, lab, auth, tasks, reports
+from app.routers import xray, lab, auth, tasks, reports, ws
 
 # --------------- Rate Limiter ---------------
 ratelimit_enabled = os.getenv("RATELIMIT_ENABLED", "true").lower() != "false"
@@ -40,6 +41,27 @@ async def add_security_headers(request: Request, call_next):
     response.headers["Content-Security-Policy"] = "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'"
     return response
 
+# --------------- CSRF Middleware ---------------
+@app.middleware("http")
+async def csrf_middleware(request: Request, call_next):
+    if request.method in ["POST", "PUT", "DELETE", "PATCH"]:
+        csrf_token = request.headers.get("x-csrf-token")
+        cookie_token = request.cookies.get("csrf_token")
+        if not csrf_token or not cookie_token or csrf_token != cookie_token:
+            return Response("CSRF token missing or incorrect", status_code=403)
+            
+    response = await call_next(request)
+    
+    if "csrf_token" not in request.cookies:
+        response.set_cookie(
+            key="csrf_token",
+            value=secrets.token_urlsafe(32),
+            httponly=False,
+            samesite="lax",
+            secure=False
+        )
+    return response
+
 # --------------- CORS Middleware ---------------
 app.add_middleware(
     CORSMiddleware,
@@ -62,6 +84,7 @@ app.include_router(xray.router, prefix="/api/xray", tags=["X-Ray Analysis"])
 app.include_router(lab.router, prefix="/api/lab", tags=["Lab Analysis"])
 app.include_router(tasks.router, prefix="/api/tasks", tags=["Background Tasks"])
 app.include_router(reports.router, prefix="/api/reports", tags=["Reports"])
+app.include_router(ws.router, prefix="/api", tags=["WebSockets"])
 
 
 @app.get("/api/health")

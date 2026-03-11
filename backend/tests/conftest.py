@@ -67,7 +67,10 @@ def setup_database():
 @pytest.fixture
 def client():
     """Pre-configured TestClient for the FastAPI application."""
-    return TestClient(app)
+    test_client = TestClient(app)
+    test_client.headers.update({"x-csrf-token": "test_csrf_token"})
+    test_client.cookies.set("csrf_token", "test_csrf_token")
+    return test_client
 
 
 @pytest.fixture

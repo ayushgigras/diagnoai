@@ -1,4 +1,3 @@
-import React from 'react';
 import { Card } from '../common/Card';
 import { cn } from '../../lib/utils';
 import { Stethoscope, Activity, User, Scan, Lock } from 'lucide-react';

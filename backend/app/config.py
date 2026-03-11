@@ -8,11 +8,15 @@ class Settings(BaseSettings):
     
     PROJECT_NAME: str = "DiagnoAI"
     PROJECT_VERSION: str = "1.0.0"
-    BACKEND_CORS_ORIGINS: List[str] = ["http://localhost:5173", "http://localhost:3000"]
+    BACKEND_CORS_ORIGINS: List[str] = ["http://localhost:5173", "http://localhost:3000", "http://127.0.0.1:5173"]
     ALLOWED_HOSTS: Union[List[str], str] = ["localhost", "127.0.0.1"]
     
     # Environment API Keys
     GEMINI_API_KEY: str | None = None
+
+    # Redis / Celery
+    CELERY_BROKER_URL: str = "redis://127.0.0.1:6379/0"
+    CELERY_RESULT_BACKEND: str = "redis://127.0.0.1:6379/0"
 
     # Upload paths
     UPLOAD_DIR: str = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "temp_uploads")

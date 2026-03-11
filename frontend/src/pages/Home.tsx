@@ -1,4 +1,3 @@
-import React from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight, Scan, FlaskConical, ShieldCheck, Zap, Brain } from 'lucide-react';
 import { motion } from 'framer-motion';

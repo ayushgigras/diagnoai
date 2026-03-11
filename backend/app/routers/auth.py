@@ -7,7 +7,7 @@ from slowapi.util import get_remote_address
 
 from ..database import get_db
 from ..models.user import User
-from ..schemas.user import UserResponse, UserCreate
+from ..schemas.user import UserResponse, UserCreate, UserUpdate
 from ..utils.security import verify_password, get_password_hash, create_access_token, ACCESS_TOKEN_EXPIRE_MINUTES
 from ..dependencies import get_current_user
 
@@ -60,4 +60,21 @@ def login(request: Request, db: Session = Depends(get_db), form_data: OAuth2Pass
 
 @router.get("/me", response_model=UserResponse)
 def read_users_me(current_user: User = Depends(get_current_user)):
+    return current_user
+
+@router.put("/profile", response_model=UserResponse)
+def update_profile(
+    user_update: UserUpdate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    if user_update.full_name is not None:
+        current_user.full_name = user_update.full_name
+    if user_update.email is not None:
+        existing_user = db.query(User).filter(User.email == user_update.email).first()
+        if existing_user and existing_user.id != current_user.id:
+            raise HTTPException(status_code=400, detail="Email already registered")
+        current_user.email = user_update.email
+    db.commit()
+    db.refresh(current_user)
     return current_user

@@ -13,6 +13,7 @@ interface AuthState {
     isAuthenticated: boolean;
     login: (token: string, user: User) => void;
     logout: () => void;
+    updateUser: (user: User) => void;
 }
 
 const useAuthStore = create<AuthState>((set) => {
@@ -32,6 +33,11 @@ const useAuthStore = create<AuthState>((set) => {
             localStorage.setItem('diagnoai_token', token);
             localStorage.setItem('diagnoai_user', JSON.stringify(user));
             set({ token, user, isAuthenticated: true });
+        },
+
+        updateUser: (user: User) => {
+            localStorage.setItem('diagnoai_user', JSON.stringify(user));
+            set({ user });
         },
 
         logout: () => {

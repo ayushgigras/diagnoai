@@ -4,6 +4,22 @@ from .celery_app import celery_app
 from .services import xray_service, ocr_service, lab_service
 from .database import SessionLocal
 from .models.report import Report
+import redis
+import json
+from .config import settings
+
+def notify_user(doctor_id: int, message_type: str, report_id: int, status: str, details: str = ""):
+    try:
+        r = redis.from_url(settings.CELERY_BROKER_URL)
+        payload = {
+            "type": message_type,
+            "report_id": report_id,
+            "status": status,
+            "details": details
+        }
+        r.publish(f"notifications:{doctor_id}", json.dumps(payload))
+    except Exception as e:
+        print(f"Failed to publish notification: {e}")
 
 # Helper to run async functions from synchronous celery tasks
 def run_async(coro):
@@ -42,6 +58,8 @@ def process_xray(self, file_path: str, xray_type: str, report_id: int):
         report.result_data = result
         db.commit()
 
+        notify_user(report.doctor_id, "xray_analysis", report.id, "completed", "X-Ray analysis is ready.")
+
         return result
     except Exception as e:
         report = db.query(Report).filter(Report.id == report_id).first()
@@ -49,6 +67,7 @@ def process_xray(self, file_path: str, xray_type: str, report_id: int):
             report.status = "failed"
             report.result_data = {"error": str(e)}
             db.commit()
+            notify_user(report.doctor_id, "xray_analysis", report.id, "failed", f"X-Ray analysis failed: {str(e)}")
         raise e
     finally:
         db.close()
@@ -85,6 +104,8 @@ def process_lab(self, file_path: str, filename: str, report_id: int):
         report.result_data = analysis
         db.commit()
 
+        notify_user(report.doctor_id, "lab_analysis", report.id, "completed", "Lab report analysis is ready.")
+
         return analysis
     except Exception as e:
         report = db.query(Report).filter(Report.id == report_id).first()
@@ -92,6 +113,7 @@ def process_lab(self, file_path: str, filename: str, report_id: int):
             report.status = "failed"
             report.result_data = {"error": str(e)}
             db.commit()
+            notify_user(report.doctor_id, "lab_analysis", report.id, "failed", f"Lab report analysis failed: {str(e)}")
         raise e
     finally:
         db.close()
