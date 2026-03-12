@@ -5,7 +5,7 @@ from app.utils.upload import validate_and_save_upload
 from app.database import get_db
 from app.models.report import Report
 from app.models.user import User
-from app.dependencies import get_current_active_doctor
+from app.dependencies import get_current_user
 from app.utils.patient import resolve_patient_id
 
 router = APIRouter()
@@ -15,7 +15,7 @@ async def analyze_xray(
     file: UploadFile = File(...),
     xray_type: str = Form(...),
     patient_id: int | None = Form(None),
-    current_user: User = Depends(get_current_active_doctor),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     try:

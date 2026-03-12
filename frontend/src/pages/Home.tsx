@@ -1,8 +1,10 @@
 import { Link } from 'react-router-dom';
 import { ArrowRight, Scan, FlaskConical, ShieldCheck, Zap, Brain } from 'lucide-react';
 import { motion } from 'framer-motion';
+import useAuthStore from '../store/useAuthStore';
 
 const Home = () => {
+    const { user } = useAuthStore();
     return (
         <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
             {/* Hero Section */}
@@ -37,21 +39,34 @@ const Home = () => {
                             transition={{ duration: 0.5, delay: 0.4 }}
                             className="mt-10 flex justify-center gap-4"
                         >
-                            <Link
-                                to="/xray"
-                                className="group relative px-8 py-3 bg-primary hover:bg-primary/90 text-white rounded-full font-semibold transition-all shadow-lg hover:shadow-primary/30 flex items-center gap-2"
-                            >
-                                <Scan className="w-5 h-5" />
-                                Analyze X-Ray
-                                <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                            </Link>
-                            <Link
-                                to="/lab"
-                                className="group relative px-8 py-3 bg-white dark:bg-slate-800 text-slate-900 dark:text-white border border-slate-200 dark:border-slate-700 hover:border-secondary hover:text-secondary rounded-full font-semibold transition-all shadow-lg hover:shadow-secondary/10 flex items-center gap-2"
-                            >
-                                <FlaskConical className="w-5 h-5" />
-                                Analyze Lab Report
-                            </Link>
+                            {user?.role === 'admin' ? (
+                                <Link
+                                    to="/admin"
+                                    className="group relative px-8 py-3 bg-red-600 hover:bg-red-700 text-white rounded-full font-semibold transition-all shadow-lg hover:shadow-red-500/30 flex items-center gap-2"
+                                >
+                                    <ShieldCheck className="w-5 h-5" />
+                                    Admin Dashboard
+                                    <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                                </Link>
+                            ) : (
+                                <>
+                                    <Link
+                                        to="/xray"
+                                        className="group relative px-8 py-3 bg-primary hover:bg-primary/90 text-white rounded-full font-semibold transition-all shadow-lg hover:shadow-primary/30 flex items-center gap-2"
+                                    >
+                                        <Scan className="w-5 h-5" />
+                                        Analyze X-Ray
+                                        <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                                    </Link>
+                                    <Link
+                                        to="/lab"
+                                        className="group relative px-8 py-3 bg-white dark:bg-slate-800 text-slate-900 dark:text-white border border-slate-200 dark:border-slate-700 hover:border-secondary hover:text-secondary rounded-full font-semibold transition-all shadow-lg hover:shadow-secondary/10 flex items-center gap-2"
+                                    >
+                                        <FlaskConical className="w-5 h-5" />
+                                        Analyze Lab Report
+                                    </Link>
+                                </>
+                            )}
                         </motion.div>
                     </div>
                 </div>

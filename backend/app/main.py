@@ -8,7 +8,7 @@ import os
 import secrets
 
 from app.config import settings
-from app.routers import xray, lab, auth, tasks, reports, ws
+from app.routers import xray, lab, auth, tasks, reports, ws, admin
 
 # --------------- Rate Limiter ---------------
 ratelimit_enabled = os.getenv("RATELIMIT_ENABLED", "true").lower() != "false"
@@ -67,7 +67,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.BACKEND_CORS_ORIGINS,
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type", "X-CSRF-Token"],
     expose_headers=["X-CSRF-Token"],
 )
@@ -85,6 +85,7 @@ app.include_router(lab.router, prefix="/api/lab", tags=["Lab Analysis"])
 app.include_router(tasks.router, prefix="/api/tasks", tags=["Background Tasks"])
 app.include_router(reports.router, prefix="/api/reports", tags=["Reports"])
 app.include_router(ws.router, prefix="/api", tags=["WebSockets"])
+app.include_router(admin.router, prefix="/api/admin", tags=["Admin"])
 
 
 @app.get("/api/health")

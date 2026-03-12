@@ -21,6 +21,13 @@ class User(Base):
     role = Column(String, default=UserRole.patient.value)  # admin, doctor, patient
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
+    
+    # New Profile Fields
+    phone = Column(String, nullable=True)
+    bio = Column(String, nullable=True)
+    location = Column(String, nullable=True)
+    profile_image_url = Column(String, nullable=True)
+    specialization = Column(String, nullable=True)  # Mainly for doctors
 
     # Relationships
     reports = relationship("Report", back_populates="doctor")

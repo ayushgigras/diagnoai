@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { FileText, Brain, FlaskConical, Clock, CheckCircle, XCircle, Loader2, Trash2 } from 'lucide-react';
+import { FileText, Brain, FlaskConical, Clock, CheckCircle, XCircle, Loader2, Trash2, CheckSquare2, Square } from 'lucide-react';
 import api from '../services/api';
 import AnalysisResults from '../components/xray/AnalysisResults';
 import LabResults from '../components/lab/LabResults';
@@ -28,6 +28,7 @@ const History = () => {
     const [filterType, setFilterType] = useState('all');
     const [filterStatus, setFilterStatus] = useState('all');
     const [expandedId, setExpandedId] = useState<number | null>(null);
+    const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
 
     useEffect(() => {
         const fetchReports = async () => {
@@ -52,6 +53,38 @@ const History = () => {
         } catch (err: any) {
             console.error(err);
             alert('Failed to delete report.');
+        }
+    };
+
+    const toggleSelect = (id: number) => {
+        const newSelected = new Set(selectedIds);
+        if (newSelected.has(id)) {
+            newSelected.delete(id);
+        } else {
+            newSelected.add(id);
+        }
+        setSelectedIds(newSelected);
+    };
+
+    const selectAllReports = () => {
+        if (selectedIds.size === filteredReports.length) {
+            setSelectedIds(new Set());
+        } else {
+            setSelectedIds(new Set(filteredReports.map(r => r.id)));
+        }
+    };
+
+    const handleBulkDelete = async () => {
+        if (selectedIds.size === 0) return;
+        if (!window.confirm(`Are you sure you want to delete ${selectedIds.size} report(s)?`)) return;
+        try {
+            await Promise.all([...selectedIds].map(id => api.delete(`/reports/${id}`)));
+            alert(`${selectedIds.size} report(s) deleted successfully`);
+            setReports(prev => prev.filter(r => !selectedIds.has(r.id)));
+            setSelectedIds(new Set());
+        } catch (err: any) {
+            console.error(err);
+            alert('Failed to delete some reports.');
         }
     };
 
@@ -99,7 +132,37 @@ const History = () => {
                 </div>
             )}
 
-            <div className="flex flex-col sm:flex-row gap-4 mb-6">
+            {/* Bulk Actions Bar */}
+            {selectedIds.size > 0 && (
+                <motion.div 
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="mb-6 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg flex items-center justify-between"
+                >
+                    <div className="flex items-center gap-3">
+                        <span className="font-semibold text-blue-900 dark:text-blue-100">
+                            {selectedIds.size} report{selectedIds.size !== 1 ? 's' : ''} selected
+                        </span>
+                    </div>
+                    <div className="flex gap-2">
+                        <button
+                            onClick={handleBulkDelete}
+                            className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg font-medium flex items-center gap-2 transition-colors"
+                        >
+                            <Trash2 className="w-4 h-4" /> Delete Selected
+                        </button>
+                        <button
+                            onClick={() => setSelectedIds(new Set())}
+                            className="px-4 py-2 bg-slate-300 dark:bg-slate-700 hover:bg-slate-400 dark:hover:bg-slate-600 text-slate-800 dark:text-white rounded-lg font-medium transition-colors"
+                        >
+                            Clear Selection
+                        </button>
+                    </div>
+                </motion.div>
+            )}
+
+            <div className="flex flex-col sm:flex-row gap-4 mb-6 items-center justify-between">
+                <div className="flex flex-col sm:flex-row gap-4 flex-1">
                 <select 
                     value={filterType} 
                     onChange={(e) => setFilterType(e.target.value)}
@@ -119,6 +182,19 @@ const History = () => {
                     <option value="pending">Processing</option>
                     <option value="failed">Failed</option>
                 </select>
+                </div>
+                {filteredReports.length > 0 && (
+                    <button
+                        onClick={selectAllReports}
+                        className="px-4 py-2 text-primary hover:bg-primary/10 rounded-lg font-medium flex items-center gap-2 transition-colors whitespace-nowrap"
+                    >
+                        {selectedIds.size === filteredReports.length && filteredReports.length > 0 ? (
+                            <><CheckSquare2 className="w-4 h-4" /> Deselect All</>
+                        ) : (
+                            <><Square className="w-4 h-4" /> Select All</>
+                        )}
+                    </button>
+                )}
             </div>
 
             {filteredReports.length === 0 ? (
@@ -140,6 +216,7 @@ const History = () => {
                         const StatusIcon = status.icon;
                         const isXray = report.report_type === 'xray';
                         const isExpanded = expandedId === report.id;
+                        const isSelected = selectedIds.has(report.id);
 
                         return (
                             <motion.div
@@ -147,11 +224,22 @@ const History = () => {
                                 initial={{ opacity: 0, y: 10 }}
                                 animate={{ opacity: 1, y: 0 }}
                                 transition={{ delay: i * 0.04 }}
-                                className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-5 hover:shadow-md transition-all"
+                                className={`bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-5 hover:shadow-md transition-all ${isSelected ? 'border-primary bg-primary/5 dark:bg-primary/5' : ''}`}
                             >
                                 <div className="flex flex-col sm:flex-row items-start justify-between gap-4">
-                                    {/* Left: Icon + Info */}
-                                    <div className="flex items-start gap-4">
+                                    {/* Checkbox + Left: Icon + Info */}
+                                    <div className="flex items-start gap-3 w-full sm:w-auto">
+                                        <button
+                                            onClick={() => toggleSelect(report.id)}
+                                            className="text-slate-600 dark:text-slate-400 hover:text-primary transition-colors mt-1 shrink-0"
+                                        >
+                                            {isSelected ? (
+                                                <CheckSquare2 className="w-5 h-5 text-primary" />
+                                            ) : (
+                                                <Square className="w-5 h-5" />
+                                            )}
+                                        </button>
+                                        <div className="flex items-start gap-4 flex-1">
                                         <div className={`p-2.5 rounded-lg shrink-0 ${isXray ? 'bg-blue-50 dark:bg-blue-900/20' : 'bg-violet-50 dark:bg-violet-900/20'}`}>
                                             {isXray
                                                 ? <Brain className="w-5 h-5 text-blue-500" />
@@ -197,6 +285,7 @@ const History = () => {
                                                     </button>
                                                 </div>
                                             )}
+                                        </div>
                                         </div>
                                     </div>
 

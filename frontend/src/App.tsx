@@ -10,6 +10,7 @@ import Register from './pages/Register';
 import About from './pages/About';
 import History from './pages/History';
 import Profile from './pages/Profile';
+import AdminDashboard from './pages/AdminDashboard';
 import ProtectedRoute from './components/common/ProtectedRoute';
 import NotificationsHelper from './components/common/NotificationsHelper';
 import api from './services/api';
@@ -31,16 +32,23 @@ function App() {
             <Route path="/register" element={<Register />} />
             <Route path="/about" element={<About />} />
 
-            {/* Protected Routes - all authenticated users */}
-            <Route element={<ProtectedRoute />}>
+            {/* Protected Routes - patient & doctor only */}
+            <Route element={<ProtectedRoute allowedRoles={["patient", "doctor"]} />}>
               <Route path="/lab" element={<LabAnalysis />} />
+              <Route path="/xray" element={<XRayAnalysis />} />
               <Route path="/history" element={<History />} />
+            </Route>
+
+            {/* Common Protected Routes */}
+            <Route element={<ProtectedRoute />}>
               <Route path="/profile" element={<Profile />} />
             </Route>
-            {/* Doctor/Admin only */}
-            <Route element={<ProtectedRoute allowedRoles={["doctor", "admin"]} />}>
-              <Route path="/xray" element={<XRayAnalysis />} />
+
+            {/* Admin only */}
+            <Route element={<ProtectedRoute allowedRoles={["admin"]} />}>
+              <Route path="/admin" element={<AdminDashboard />} />
             </Route>
+
             <Route path="*" element={
               <div className="flex items-center justify-center h-full min-h-[50vh]">
                 <h1 className="text-2xl text-slate-500">404 - Page Not Found</h1>

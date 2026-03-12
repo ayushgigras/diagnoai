@@ -25,13 +25,23 @@ def register(request: Request, user_in: UserCreate, db: Session = Depends(get_db
             detail="The user with this email already exists in the system.",
         )
     
-    # Create new user – all public registrations get the "patient" role.
-    # Only admins can elevate roles (via DB or future admin endpoint).
+    # Create new user – allow role from request (defaults to patient in schema)
+    # Validation: prevent unauthorized admin registration
+    requested_role = user_in.role if user_in.role in ["doctor", "patient", "admin"] else "patient"
+    
+    if requested_role == "admin":
+        from ..config import settings
+        if user_in.admin_secret != settings.ADMIN_REGISTRATION_KEY:
+            raise HTTPException(
+                status_code=403,
+                detail="Invalid admin registration key."
+            )
+    
     user = User(
         email=user_in.email,
         hashed_password=get_password_hash(user_in.password),
         full_name=user_in.full_name,
-        role="patient"
+        role=requested_role
     )
     db.add(user)
     db.commit()
@@ -76,6 +86,19 @@ def update_profile(
         if existing_user and existing_user.id != current_user.id:
             raise HTTPException(status_code=400, detail="Email already registered")
         current_user.email = user_update.email
+    
+    # Update new profile fields
+    if user_update.phone is not None:
+        current_user.phone = user_update.phone
+    if user_update.bio is not None:
+        current_user.bio = user_update.bio
+    if user_update.location is not None:
+        current_user.location = user_update.location
+    if user_update.profile_image_url is not None:
+        current_user.profile_image_url = user_update.profile_image_url
+    if user_update.specialization is not None:
+        current_user.specialization = user_update.specialization
+        
     db.commit()
     db.refresh(current_user)
     return current_user

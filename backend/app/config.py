@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     
     # Environment API Keys
     GEMINI_API_KEY: str | None = None
+    ADMIN_REGISTRATION_KEY: str
 
     # Redis / Celery
     CELERY_BROKER_URL: str = "redis://127.0.0.1:6379/0"

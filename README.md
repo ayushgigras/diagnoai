@@ -111,6 +111,7 @@ GEMINI_API_KEY=your-gemini-api-key
 DATABASE_URL=postgresql://postgres:your_strong_password@localhost:5432/diagnoai
 CELERY_BROKER_URL=redis://localhost:6379/0
 CELERY_RESULT_BACKEND=redis://localhost:6379/1
+ADMIN_REGISTRATION_KEY=your-admin-secret-key
 APP_ENV=development
 ```
 
@@ -166,6 +167,9 @@ Opens at `http://localhost:8501`. Ensure the backend API server is running on po
 | GET    | `/api/tasks/status/{id}`  | Yes  | Check background task status         |
 | GET    | `/api/reports/history`    | Yes  | Get authenticated user's report history|
 | WS     | `/api/ws/{client_id}`     | No*  | Connect to WebSocket notifications   |
+| GET    | `/api/admin/users`        | Admin| List all users                       |
+| PATCH  | `/api/admin/users/{id}/role`| Admin| Update a user's role               |
+| DELETE | `/api/admin/users/{id}`   | Admin| Delete a user                        |
 | GET    | `/api/health`             | No   | Health check                         |
 
 ## Security
@@ -219,9 +223,11 @@ Tests cover:
 
 ## Notes
 
-- Auth is JWT-based and `JWT_SECRET_KEY` is required (app will not start in production without it).
+- Auth is JWT-based. `JWT_SECRET_KEY` is required in production (a dev fallback is used automatically when `APP_ENV=development`).
+- `ADMIN_REGISTRATION_KEY` is always required at startup. It is used to gate admin-role registrations via `POST /api/auth/register`.
 - Background analysis (`/api/lab/analyze-from-file`) uses Celery + Redis. X-ray analysis operates synchronously.
 - `patient_id` can be passed in analyze requests; if omitted, backend resolves a fallback patient.
+- New self-registrations default to the `patient` role. To register as `admin`, supply `admin_secret` matching `ADMIN_REGISTRATION_KEY` in the request body.
 
 ## AI Capabilities
 

@@ -13,7 +13,9 @@ class ReportCreate(ReportBase):
 
 class ReportResponse(ReportBase):
     id: int
-    doctor_id: int
+    doctor_id: Optional[int] = None
+    doctor_name: Optional[str] = None # Added for admin dashboard
+    patient_name: Optional[str] = None # Added for admin dashboard
     file_path: Optional[str] = None
     task_id: Optional[str] = None
     created_at: datetime

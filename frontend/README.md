@@ -4,7 +4,7 @@ Modern React application for the DiagnoAI healthcare platform.
 
 ## Features
 
-- **X-Ray Analysis Interface**: Drag & drop upload with async task polling and explainable results.
+- **X-Ray Analysis Interface**: Drag & drop upload with synchronous analysis and explainable results.
 - **Lab Analysis Interface**: 
    - Manual parameter entry
    - PDF/Image upload with Gemini OCR extraction
@@ -47,6 +47,14 @@ Access to frontend features is controlled by the user's role:
    ```bash
    npm run build
    ```
+
+## Testing
+
+```bash
+npm test
+```
+
+Runs the Vitest test suite. Tests cover auth store (login, logout, localStorage persistence) and App component rendering.
 
 ## Configuration
 

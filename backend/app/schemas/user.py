@@ -7,13 +7,25 @@ class UserBase(BaseModel):
     email: EmailStr
     full_name: Optional[str] = None
     role: Optional[str] = "patient"
+    phone: Optional[str] = None
+    bio: Optional[str] = None
+    location: Optional[str] = None
+    profile_image_url: Optional[str] = None
+    specialization: Optional[str] = None
 
 class UserUpdate(BaseModel):
     full_name: Optional[str] = None
     email: Optional[EmailStr] = None
+    phone: Optional[str] = None
+    bio: Optional[str] = None
+    location: Optional[str] = None
+    profile_image_url: Optional[str] = None
+    specialization: Optional[str] = None
+    is_active: Optional[bool] = None
 
 class UserCreate(UserBase):
     password: str
+    admin_secret: Optional[str] = None
 
     @field_validator("password")
     @classmethod

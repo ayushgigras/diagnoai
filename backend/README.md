@@ -18,9 +18,10 @@ GEMINI_API_KEY=your-gemini-api-key
 DATABASE_URL=postgresql://postgres:your_strong_password@localhost:5432/diagnoai
 CELERY_BROKER_URL=redis://localhost:6379/0
 CELERY_RESULT_BACKEND=redis://localhost:6379/1
+ADMIN_REGISTRATION_KEY=your-admin-secret-key
 ```
 
-`JWT_SECRET_KEY` is required at startup.
+`JWT_SECRET_KEY` is required at startup in production (a dev fallback is used automatically when `APP_ENV=development`). `ADMIN_REGISTRATION_KEY` is always required and gates admin-role self-registration.
 
 ## Setup
 
@@ -71,3 +72,11 @@ The system enforces three user roles:
 - `POST /api/lab/analyze-from-file` accepts multipart fields: `file`, optional `patient_id`. Runs via background tasks.
 - `POST /api/lab/analyze-manual` accepts JSON body with `values` and optional `patient_id`.
 - `WS /api/ws/{client_id}` connects a client for real-time WebSocket notifications.
+- `GET /api/admin/users` — admin only: list all users.
+- `PATCH /api/admin/users/{id}/role` — admin only: update a user's role.
+- `DELETE /api/admin/users/{id}` — admin only: delete a user.
+- `GET /api/admin/reports` — admin only: list all reports in the system.
+
+## Admin Registration
+
+To create an admin account, include `"role": "admin"` and `"admin_secret": "<ADMIN_REGISTRATION_KEY>"` in the `POST /api/auth/register` request body. Requests with the wrong key are rejected with HTTP 403.

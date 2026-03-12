@@ -1,21 +1,31 @@
-import { Link, useLocation } from 'react-router-dom';
-import { Activity, Menu, X } from 'lucide-react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Activity, Menu, X, User as UserIcon, LogOut } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useState } from 'react';
 import useAuthStore from '../../store/useAuthStore';
 
 const Navbar = () => {
     const location = useLocation();
+    const navigate = useNavigate();
     const [isOpen, setIsOpen] = useState(false);
     const { isAuthenticated, logout, user } = useAuthStore();
 
+    const handleLogout = () => {
+        logout();
+        navigate('/login');
+    };
+
     const navLinks = [
         { name: 'Home', path: '/' },
-        // Only show these in the mapped links if authenticated, or we can handle them separately
+        // Only show these in the mapped links if authenticated
         ...(isAuthenticated ? [
-            ...(user?.role !== 'patient' ? [{ name: 'X-Ray Analysis', path: '/xray' }] : []),
-            { name: 'Lab Analysis', path: '/lab' },
-            { name: 'History', path: '/history' },
+            ...(user?.role !== 'admin' ? [
+                { name: 'X-Ray Analysis', path: '/xray' },
+                { name: 'Lab Analysis', path: '/lab' },
+                { name: 'History', path: '/history' },
+            ] : [
+                { name: 'Admin', path: '/admin' }
+            ]),
         ] : []),
         { name: 'About', path: '/about' },
     ];
@@ -52,17 +62,31 @@ const Navbar = () => {
 
                     <div className="hidden md:flex items-center space-x-4">
                         {isAuthenticated ? (
-                            <div className="flex items-center space-x-4">
-                                <Link to="/profile" className="text-sm font-medium text-slate-600 dark:text-slate-300 hover:text-primary transition-colors">
-                                    {user?.full_name}
+                            <>
+                                <Link
+                                    to="/profile"
+                                    className="flex items-center gap-3 px-3 py-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors group"
+                                >
+                                    <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center border border-primary/20 group-hover:border-primary/40 transition-colors">
+                                        <UserIcon className="w-4 h-4 text-primary" />
+                                    </div>
+                                    <div className="hidden sm:block text-left">
+                                        <div className="text-sm font-bold text-slate-700 dark:text-slate-200 leading-none group-hover:text-primary transition-colors">
+                                            {user?.full_name?.split(' ')[0] || 'User'}
+                                        </div>
+                                        <div className="text-[10px] font-medium text-slate-400 dark:text-slate-500 uppercase tracking-tighter mt-1">
+                                            {user?.role}
+                                        </div>
+                                    </div>
                                 </Link>
                                 <button
-                                    onClick={logout}
-                                    className="px-4 py-2 text-sm font-medium text-white bg-red-500 rounded-md hover:bg-red-600 transition-colors"
+                                    onClick={handleLogout}
+                                    className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-slate-700 dark:text-slate-200 hover:text-red-500 transition-colors"
                                 >
-                                    Log out
+                                    <LogOut className="w-4 h-4" />
+                                    <span className="hidden sm:inline">Logout</span>
                                 </button>
-                            </div>
+                            </>
                         ) : (
                             <div className="flex items-center space-x-2">
                                 <Link
