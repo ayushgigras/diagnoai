@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import useAuthStore from '../store/useAuthStore';
 import api from '../services/api';
 import { 
@@ -32,6 +32,31 @@ export default function Profile() {
 
     const [status, setStatus] = useState<{ type: 'success' | 'error', message: string } | null>(null);
     const [loading, setLoading] = useState(false);
+    const [uploading, setUploading] = useState(false);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+    
+    // Sync form with user state when it changes
+    useEffect(() => {
+        if (user) {
+            setFormData({
+                full_name: user.full_name || '',
+                email: user.email || '',
+                phone: user.phone || '',
+                bio: user.bio || '',
+                location: user.location || '',
+                specialization: user.specialization || '',
+                profile_image_url: user.profile_image_url || ''
+            });
+        }
+    }, [user]);
+
+    // Auto-clear status message
+    useEffect(() => {
+        if (status) {
+            const timer = setTimeout(() => setStatus(null), 5000);
+            return () => clearTimeout(timer);
+        }
+    }, [status]);
 
     // Completion percentage logic
     const completionData = useMemo(() => {
@@ -79,6 +104,36 @@ export default function Profile() {
         }
     };
 
+    const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        // Basic validation
+        if (file.size > 10 * 1024 * 1024) {
+            setStatus({ type: 'error', message: 'File size exceeds 10MB limit.' });
+            return;
+        }
+
+        const formDataUpload = new FormData();
+        formDataUpload.append('file', file);
+
+        setUploading(true);
+        setStatus(null);
+        try {
+            const res = await api.post('/auth/profile-image', formDataUpload, {
+                headers: {
+                    'Content-Type': 'multipart/form-data',
+                },
+            });
+            updateUser(res.data.user);
+            setStatus({ type: 'success', message: 'Profile picture updated!' });
+        } catch (err: any) {
+            setStatus({ type: 'error', message: err.response?.data?.detail || 'Failed to upload image' });
+        } finally {
+            setUploading(false);
+        }
+    };
+
     return (
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -97,8 +152,24 @@ export default function Profile() {
                                 ) : (
                                     <UserIcon className="w-12 h-12 text-primary" />
                                 )}
+                                {uploading && (
+                                    <div className="absolute inset-0 rounded-full bg-black/40 flex items-center justify-center">
+                                        <Loader2 className="w-8 h-8 text-white animate-spin" />
+                                    </div>
+                                )}
                             </div>
-                            <button className="absolute bottom-0 right-0 bg-white dark:bg-slate-800 p-2 rounded-full shadow-lg border border-slate-200 dark:border-slate-700 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <input 
+                                type="file" 
+                                ref={fileInputRef} 
+                                onChange={handleImageUpload} 
+                                className="hidden" 
+                                accept="image/*"
+                            />
+                            <button 
+                                onClick={() => fileInputRef.current?.click()}
+                                disabled={uploading}
+                                className="absolute bottom-0 right-0 bg-white dark:bg-slate-800 p-2 rounded-full shadow-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+                            >
                                 <Camera className="w-4 h-4 text-slate-600" />
                             </button>
                         </div>
@@ -226,6 +297,19 @@ export default function Profile() {
                                         value={formData.location}
                                         onChange={handleChange}
                                         placeholder="New Delhi, India"
+                                        className="w-full rounded-xl border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm focus:border-primary focus:ring-primary dark:text-white sm:text-sm py-3 px-4"
+                                    />
+                                </div>
+                                <div className="md:col-span-2">
+                                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2 flex items-center gap-2">
+                                        <Camera className="w-4 h-4 text-slate-400" /> Profile Image URL
+                                    </label>
+                                    <input 
+                                        name="profile_image_url"
+                                        type="text" 
+                                        value={formData.profile_image_url}
+                                        onChange={handleChange}
+                                        placeholder="https://example.com/image.jpg"
                                         className="w-full rounded-xl border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm focus:border-primary focus:ring-primary dark:text-white sm:text-sm py-3 px-4"
                                     />
                                 </div>

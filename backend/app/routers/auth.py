@@ -1,5 +1,6 @@
 from datetime import timedelta
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+from datetime import timedelta
+from fastapi import APIRouter, Depends, HTTPException, status, Request, UploadFile, File
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from slowapi import Limiter
@@ -10,6 +11,7 @@ from ..models.user import User
 from ..schemas.user import UserResponse, UserCreate, UserUpdate
 from ..utils.security import verify_password, get_password_hash, create_access_token, ACCESS_TOKEN_EXPIRE_MINUTES
 from ..dependencies import get_current_user
+from ..utils.upload import validate_and_save_upload
 
 limiter = Limiter(key_func=get_remote_address)
 router = APIRouter(tags=["Authentication"])
@@ -102,3 +104,22 @@ def update_profile(
     db.commit()
     db.refresh(current_user)
     return current_user
+
+@router.post("/profile-image")
+def upload_profile_image(
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    try:
+        file_path = validate_and_save_upload(file, is_xray=False)
+        filename = os.path.basename(file_path)
+        # Using relative URL since backend serves /uploads
+        image_url = f"http://localhost:8000/uploads/{filename}"
+        
+        current_user.profile_image_url = image_url
+        db.commit()
+        db.refresh(current_user)
+        return {"profile_image_url": image_url, "user": UserResponse.model_validate(current_user)}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))

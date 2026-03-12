@@ -5,6 +5,12 @@ interface User {
     email: string;
     full_name: string;
     role: "admin" | "doctor" | "patient";
+    phone?: string;
+    bio?: string;
+    location?: string;
+    specialization?: string;
+    profile_image_url?: string;
+    is_active: boolean;
 }
 
 interface AuthState {
