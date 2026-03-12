@@ -6,7 +6,7 @@ import re
 class UserBase(BaseModel):
     email: EmailStr
     full_name: Optional[str] = None
-    role: Optional[str] = "doctor"
+    role: Optional[str] = "patient"
 
 class UserUpdate(BaseModel):
     full_name: Optional[str] = None

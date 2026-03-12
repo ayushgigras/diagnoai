@@ -31,12 +31,15 @@ function App() {
             <Route path="/register" element={<Register />} />
             <Route path="/about" element={<About />} />
 
-            {/* Protected Routes */}
+            {/* Protected Routes - all authenticated users */}
             <Route element={<ProtectedRoute />}>
-              <Route path="/xray" element={<XRayAnalysis />} />
               <Route path="/lab" element={<LabAnalysis />} />
               <Route path="/history" element={<History />} />
               <Route path="/profile" element={<Profile />} />
+            </Route>
+            {/* Doctor/Admin only */}
+            <Route element={<ProtectedRoute allowedRoles={["doctor", "admin"]} />}>
+              <Route path="/xray" element={<XRayAnalysis />} />
             </Route>
             <Route path="*" element={
               <div className="flex items-center justify-center h-full min-h-[50vh]">

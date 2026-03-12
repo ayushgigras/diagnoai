@@ -56,6 +56,15 @@ CELERY_RESULT_BACKEND=redis://localhost:6379/1
 
 Once running, visit `http://127.0.0.1:8000/docs`.
 
+## Role-Based Access Control (RBAC)
+
+The system enforces three user roles:
+- **Admin**: Full access to all endpoints.
+- **Doctor**: Can access both X-Ray analysis and Lab analysis.
+- **Patient**: Can access Lab analysis and view history, but is restricted from X-Ray analysis.
+
+*Note: All public registrations are automatically assigned the `patient` role. Role elevation to `doctor` or `admin` must be performed by a system administrator.*
+
 ## Endpoint Notes
 
 - `POST /api/xray/analyze` accepts multipart fields: `file`, `xray_type`, optional `patient_id`. Runs synchronously.

@@ -12,6 +12,13 @@ Modern React application for the DiagnoAI healthcare platform.
 - **History View**: Shows report status and summarized result previews.
 - **Modern UI**: Built with Tailwind CSS and Framer Motion.
 
+## Role-Based Access Control (RBAC)
+
+Access to frontend features is controlled by the user's role:
+- **Admin/Doctor**: Can see and access all tabs including X-Ray Analysis, Lab Analysis, and History.
+- **Patient**: Cannot see or access the X-Ray Analysis feature. Limited to Lab Analysis and History. 
+  *(New user registrations default to the patient role)*
+
 ## Tech Stack
 
 - React 18

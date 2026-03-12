@@ -80,15 +80,22 @@ def test_user_data():
         "email": "testdoctor@diagnoai.com",
         "full_name": "Dr. Test",
         "password": "SecurePass1!",
-        "role": "doctor",
+        "role": "doctor",  # Note: registration ignores this and sets "patient"
     }
 
 
 @pytest.fixture
 def auth_headers(client, test_user_data):
-    """Register a user, log in, and return Authorization headers."""
-    # Register
+    """Register a user, elevate to doctor, log in, and return Authorization headers."""
+    # Register (creates a patient)
     client.post("/api/auth/register", json=test_user_data)
+    # Elevate to doctor directly in the DB so existing tests pass
+    db = TestingSessionLocal()
+    from app.models.user import User
+    user = db.query(User).filter(User.email == test_user_data["email"]).first()
+    user.role = "doctor"
+    db.commit()
+    db.close()
     # Login
     login_resp = client.post(
         "/api/auth/login",
@@ -96,3 +103,44 @@ def auth_headers(client, test_user_data):
     )
     token = login_resp.json()["access_token"]
     return {"Authorization": f"Bearer {token}"}
+
+
+@pytest.fixture
+def patient_auth_headers(client):
+    """Register a patient user and return Authorization headers."""
+    patient_data = {
+        "email": "patient@diagnoai.com",
+        "full_name": "Patient Test",
+        "password": "SecurePass1!",
+    }
+    client.post("/api/auth/register", json=patient_data)
+    login_resp = client.post(
+        "/api/auth/login",
+        data={"username": patient_data["email"], "password": patient_data["password"]},
+    )
+    token = login_resp.json()["access_token"]
+    return {"Authorization": f"Bearer {token}"}
+
+
+@pytest.fixture
+def admin_auth_headers(client):
+    """Register a user, elevate to admin, and return Authorization headers."""
+    admin_data = {
+        "email": "admin@diagnoai.com",
+        "full_name": "Admin Test",
+        "password": "SecurePass1!",
+    }
+    client.post("/api/auth/register", json=admin_data)
+    db = TestingSessionLocal()
+    from app.models.user import User
+    user = db.query(User).filter(User.email == admin_data["email"]).first()
+    user.role = "admin"
+    db.commit()
+    db.close()
+    login_resp = client.post(
+        "/api/auth/login",
+        data={"username": admin_data["email"], "password": admin_data["password"]},
+    )
+    token = login_resp.json()["access_token"]
+    return {"Authorization": f"Bearer {token}"}
+

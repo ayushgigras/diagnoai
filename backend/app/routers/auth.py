@@ -25,12 +25,13 @@ def register(request: Request, user_in: UserCreate, db: Session = Depends(get_db
             detail="The user with this email already exists in the system.",
         )
     
-    # Create new user
+    # Create new user – all public registrations get the "patient" role.
+    # Only admins can elevate roles (via DB or future admin endpoint).
     user = User(
         email=user_in.email,
         hashed_password=get_password_hash(user_in.password),
         full_name=user_in.full_name,
-        role=user_in.role
+        role="patient"
     )
     db.add(user)
     db.commit()

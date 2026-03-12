@@ -6,7 +6,7 @@ from app.tasks import process_lab
 from app.database import get_db
 from app.models.report import Report
 from app.models.user import User
-from app.dependencies import get_current_active_doctor
+from app.dependencies import get_current_user
 from app.utils.patient import resolve_patient_id
 from typing import Dict, Any
 
@@ -15,7 +15,7 @@ router = APIRouter()
 @router.post("/analyze-manual")
 async def analyze_manual(
     data: Dict[str, Any] = Body(...),
-    current_user: User = Depends(get_current_active_doctor),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
@@ -49,7 +49,7 @@ async def analyze_manual(
 @router.post("/upload-file")
 async def upload_lab_file(
     file: UploadFile = File(...),
-    current_user: User = Depends(get_current_active_doctor)
+    current_user: User = Depends(get_current_user)
 ):
     try:
         # 1. Validate and save file securely
@@ -70,7 +70,7 @@ async def upload_lab_file(
 async def analyze_from_file(
     file: UploadFile = File(...),
     patient_id: int | None = Form(None),
-    current_user: User = Depends(get_current_active_doctor),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     try:

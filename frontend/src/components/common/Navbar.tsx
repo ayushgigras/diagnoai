@@ -13,7 +13,7 @@ const Navbar = () => {
         { name: 'Home', path: '/' },
         // Only show these in the mapped links if authenticated, or we can handle them separately
         ...(isAuthenticated ? [
-            { name: 'X-Ray Analysis', path: '/xray' },
+            ...(user?.role !== 'patient' ? [{ name: 'X-Ray Analysis', path: '/xray' }] : []),
             { name: 'Lab Analysis', path: '/lab' },
             { name: 'History', path: '/history' },
         ] : []),
