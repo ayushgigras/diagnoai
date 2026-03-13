@@ -22,6 +22,19 @@ def get_my_reports(
         .order_by(Report.created_at.desc())
         .all()
     )
+
+    for report in reports:
+        if report.doctor:
+            report.doctor_name = report.doctor.full_name
+        if report.patient:
+            report.patient_name = f"{report.patient.first_name} {report.patient.last_name}".strip()
+            report.patient_first_name = report.patient.first_name
+            report.patient_last_name = report.patient.last_name
+            report.patient_date_of_birth = report.patient.date_of_birth
+            report.patient_gender = report.patient.gender
+            report.patient_contact_number = report.patient.contact_number
+            report.patient_address = report.patient.address
+
     return reports
 
 @router.delete("/{report_id}")

@@ -1,13 +1,16 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { analyzeLabManual, uploadLabFile } from '../services/labService';
-import type { LabResult, OCRResult } from '../types';
+import type { LabResult, OCRResult, PatientDetails } from '../types';
+import useAuthStore from '../store/useAuthStore';
 
 import FileUploader from '../components/lab/FileUploader';
 import ExtractedDataPreview from '../components/lab/ExtractedDataPreview';
 import LabResults from '../components/lab/LabResults';
+import PatientDetailsForm from '../components/common/PatientDetailsForm';
 import Button from '../components/common/Button';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Download } from 'lucide-react';
+import { downloadReportPdf } from '../utils/reportPdf';
 
 const LabAnalysis = () => {
     const [step, setStep] = useState(1); // 1: Upload, 2: Review (OCR), 3: Results
@@ -17,13 +20,24 @@ const LabAnalysis = () => {
     const [analysisResult, setAnalysisResult] = useState<LabResult | null>(null);
     const [isProcessing, setIsProcessing] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const user = useAuthStore((state) => state.user);
+    const isDoctor = user?.role === 'doctor';
+    const [patientDetails, setPatientDetails] = useState<PatientDetails>({
+        first_name: '',
+        last_name: '',
+        date_of_birth: '',
+        gender: '',
+        contact_number: '',
+        address: '',
+    });
+    const [patientReady, setPatientReady] = useState(!isDoctor);
 
     // Handlers
     const handleManualSubmit = async (values: Record<string, string | number>[]) => {
         setIsProcessing(true);
         setError(null);
         try {
-            const result = await analyzeLabManual(values);
+            const result = await analyzeLabManual(values, isDoctor ? patientDetails : undefined);
             setAnalysisResult(result);
             setStep(3);
         } catch (err) {
@@ -62,6 +76,37 @@ const LabAnalysis = () => {
         setOcrResult(null);
         setAnalysisResult(null);
         setError(null);
+        setPatientReady(!isDoctor);
+    };
+
+    const handlePatientContinue = () => {
+        if (!patientDetails.first_name.trim() || !patientDetails.last_name.trim()) {
+            setError('Patient first name and last name are required.');
+            return;
+        }
+        setError(null);
+        setPatientReady(true);
+    };
+
+    const downloadReport = () => {
+        if (!analysisResult) return;
+        downloadReportPdf({
+            fileName: `diagnoai-lab-report-${Date.now()}`,
+            reportType: 'lab',
+            status: 'completed',
+            analyzedAt: new Date().toISOString(),
+            analyzedBy: user?.full_name || 'Doctor',
+            patient: isDoctor ? {
+                patient_name: `${patientDetails.first_name} ${patientDetails.last_name}`.trim(),
+                patient_first_name: patientDetails.first_name,
+                patient_last_name: patientDetails.last_name,
+                patient_date_of_birth: patientDetails.date_of_birth,
+                patient_gender: patientDetails.gender,
+                patient_contact_number: patientDetails.contact_number,
+                patient_address: patientDetails.address,
+            } : null,
+            result: analysisResult,
+        });
     };
 
     return (
@@ -72,7 +117,25 @@ const LabAnalysis = () => {
             </div>
 
             <AnimatePresence mode="wait">
-                {step === 1 && (
+                {isDoctor && !patientReady && (
+                    <motion.div
+                        key="patient-details"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="space-y-8 max-w-3xl mx-auto mt-10"
+                    >
+                        <PatientDetailsForm
+                            value={patientDetails}
+                            onChange={setPatientDetails}
+                            onContinue={handlePatientContinue}
+                            isSubmitting={isProcessing}
+                        />
+                        {error && <div className="text-center text-red-500 mt-4">{error}</div>}
+                    </motion.div>
+                )}
+
+                {(!isDoctor || patientReady) && step === 1 && (
                     <motion.div
                         key="step1"
                         initial={{ opacity: 0 }}
@@ -93,7 +156,7 @@ const LabAnalysis = () => {
                     </motion.div>
                 )}
 
-                {step === 2 && ocrResult && (
+                {(!isDoctor || patientReady) && step === 2 && ocrResult && (
                     <motion.div
                         key="step2"
                         initial={{ opacity: 0, x: 20 }}
@@ -117,7 +180,7 @@ const LabAnalysis = () => {
                     </motion.div>
                 )}
 
-                {step === 3 && analysisResult && (
+                {(!isDoctor || patientReady) && step === 3 && analysisResult && (
                     <motion.div
                         key="step3"
                         initial={{ opacity: 0, scale: 0.95 }}
@@ -127,10 +190,32 @@ const LabAnalysis = () => {
                             <Button variant="ghost" onClick={resetAnalysis}>
                                 <ArrowLeft className="w-4 h-4 mr-2" /> Analyze Another Report
                             </Button>
-                            <button onClick={() => window.print()} className="text-sm text-primary hover:underline">
-                                Print Report
-                            </button>
+                            <div className="flex items-center gap-4">
+                                <button onClick={() => window.print()} className="text-sm text-primary hover:underline">
+                                    Print Report
+                                </button>
+                                <button onClick={downloadReport} className="text-sm text-primary hover:underline inline-flex items-center gap-1">
+                                    <Download className="w-4 h-4" /> Download Report
+                                </button>
+                            </div>
                         </div>
+
+                        {isDoctor && (
+                            <div className="rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 p-4 mb-6">
+                                <div className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">Patient Details</div>
+                                <div className="text-sm font-semibold text-slate-900 dark:text-white mt-1">
+                                    {patientDetails.first_name} {patientDetails.last_name}
+                                </div>
+                                <div className="text-xs text-slate-500 mt-1">
+                                    {patientDetails.date_of_birth ? `DOB: ${patientDetails.date_of_birth}` : 'DOB: N/A'}
+                                    {' | '}
+                                    {patientDetails.gender ? `Gender: ${patientDetails.gender}` : 'Gender: N/A'}
+                                </div>
+                                {patientDetails.contact_number && (
+                                    <div className="text-xs text-slate-500">Contact: {patientDetails.contact_number}</div>
+                                )}
+                            </div>
+                        )}
 
                         <LabResults result={analysisResult} />
                     </motion.div>

@@ -101,6 +101,12 @@ def get_all_reports(
             report.doctor_name = report.doctor.full_name
         if report.patient:
             report.patient_name = f"{report.patient.first_name} {report.patient.last_name}"
+            report.patient_first_name = report.patient.first_name
+            report.patient_last_name = report.patient.last_name
+            report.patient_date_of_birth = report.patient.date_of_birth
+            report.patient_gender = report.patient.gender
+            report.patient_contact_number = report.patient.contact_number
+            report.patient_address = report.patient.address
             
     return reports
 

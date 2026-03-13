@@ -20,7 +20,7 @@ describe('useAuthStore', () => {
 
     it('login sets token, user, and isAuthenticated', () => {
         const { result } = renderHook(() => useAuthStore());
-        const mockUser = { id: 1, email: 'doc@test.com', full_name: 'Dr. Test', role: 'doctor' };
+        const mockUser = { id: 1, email: 'doc@test.com', full_name: 'Dr. Test', role: 'doctor' as const, is_active: true };
 
         act(() => {
             result.current.login('test-jwt-token', mockUser);
@@ -33,7 +33,7 @@ describe('useAuthStore', () => {
 
     it('login persists to localStorage', () => {
         const { result } = renderHook(() => useAuthStore());
-        const mockUser = { id: 1, email: 'doc@test.com', full_name: 'Dr. Test', role: 'doctor' };
+        const mockUser = { id: 1, email: 'doc@test.com', full_name: 'Dr. Test', role: 'doctor' as const, is_active: true };
 
         act(() => {
             result.current.login('test-jwt-token', mockUser);
@@ -45,7 +45,7 @@ describe('useAuthStore', () => {
 
     it('logout clears state and localStorage', () => {
         const { result } = renderHook(() => useAuthStore());
-        const mockUser = { id: 1, email: 'doc@test.com', full_name: 'Dr. Test', role: 'doctor' };
+        const mockUser = { id: 1, email: 'doc@test.com', full_name: 'Dr. Test', role: 'doctor' as const, is_active: true };
 
         act(() => {
             result.current.login('test-jwt-token', mockUser);

@@ -3,6 +3,25 @@ export interface APIResponse<T> {
     status: number;
 }
 
+export interface PatientDetails {
+    first_name: string;
+    last_name: string;
+    date_of_birth?: string;
+    gender?: string;
+    contact_number?: string;
+    address?: string;
+}
+
+export interface ReportPatientDetails {
+    patient_name?: string;
+    patient_first_name?: string;
+    patient_last_name?: string;
+    patient_date_of_birth?: string;
+    patient_gender?: string;
+    patient_contact_number?: string;
+    patient_address?: string;
+}
+
 export interface XAIDetail {
     radiological_finding: string;
     visual_pattern: string;

@@ -16,6 +16,12 @@ class ReportResponse(ReportBase):
     doctor_id: Optional[int] = None
     doctor_name: Optional[str] = None # Added for admin dashboard
     patient_name: Optional[str] = None # Added for admin dashboard
+    patient_first_name: Optional[str] = None
+    patient_last_name: Optional[str] = None
+    patient_date_of_birth: Optional[str] = None
+    patient_gender: Optional[str] = None
+    patient_contact_number: Optional[str] = None
+    patient_address: Optional[str] = None
     file_path: Optional[str] = None
     task_id: Optional[str] = None
     created_at: datetime

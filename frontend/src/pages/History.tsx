@@ -1,17 +1,21 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { FileText, Brain, FlaskConical, Clock, CheckCircle, XCircle, Loader2, Trash2, CheckSquare2, Square } from 'lucide-react';
+import { FileText, Brain, FlaskConical, Clock, CheckCircle, XCircle, Loader2, Trash2, CheckSquare2, Square, Download } from 'lucide-react';
 import api from '../services/api';
 import AnalysisResults from '../components/xray/AnalysisResults';
 import LabResults from '../components/lab/LabResults';
+import type { ReportPatientDetails } from '../types';
+import { downloadReportPdf } from '../utils/reportPdf';
 
-interface Report {
+interface Report extends ReportPatientDetails {
     id: number;
+    patient_id: number;
     report_type: string;
     status: string;
     result_data: any;
     created_at: string;
     task_id: string | null;
+    doctor_name?: string;
 }
 
 const statusConfig: Record<string, { icon: any; color: string; label: string }> = {
@@ -86,6 +90,34 @@ const History = () => {
             console.error(err);
             alert('Failed to delete some reports.');
         }
+    };
+
+    const getPatientName = (report: Report) => {
+        if (report.patient_name) return report.patient_name;
+        const first = report.patient_first_name || '';
+        const last = report.patient_last_name || '';
+        const full = `${first} ${last}`.trim();
+        return full || `Patient ID: ${report.patient_id}`;
+    };
+
+    const downloadReport = (report: Report) => {
+        downloadReportPdf({
+            fileName: `diagnoai-report-${report.id}`,
+            reportType: report.report_type,
+            status: report.status,
+            analyzedAt: report.created_at,
+            analyzedBy: report.doctor_name || 'Doctor',
+            patient: {
+                patient_name: getPatientName(report),
+                patient_first_name: report.patient_first_name,
+                patient_last_name: report.patient_last_name,
+                patient_date_of_birth: report.patient_date_of_birth,
+                patient_gender: report.patient_gender,
+                patient_contact_number: report.patient_contact_number,
+                patient_address: report.patient_address,
+            },
+            result: report.result_data,
+        });
     };
 
     const formatDate = (dateStr: string) => {
@@ -254,6 +286,16 @@ const History = () => {
                                                 <Clock className="w-3 h-3" />
                                                 {formatDate(report.created_at)}
                                             </p>
+                                            <p className="text-xs text-slate-500 mt-1">
+                                                Patient: <span className="font-medium text-slate-700 dark:text-slate-300">{getPatientName(report)}</span>
+                                            </p>
+                                            {(report.patient_date_of_birth || report.patient_gender) && (
+                                                <p className="text-xs text-slate-400 mt-0.5">
+                                                    {report.patient_date_of_birth ? `DOB: ${report.patient_date_of_birth}` : ''}
+                                                    {report.patient_date_of_birth && report.patient_gender ? ' | ' : ''}
+                                                    {report.patient_gender ? `Gender: ${report.patient_gender}` : ''}
+                                                </p>
+                                            )}
                                             
                                             {/* Show brief result summary if completed */}
                                             {report.status === 'completed' && report.result_data && (
@@ -292,6 +334,13 @@ const History = () => {
                                     {/* Right: Status Badge & Actions */}
                                     <div className="flex flex-col items-end gap-3 shrink-0 w-full sm:w-auto mt-4 sm:mt-0 pt-4 sm:pt-0 border-t sm:border-0 border-slate-100 dark:border-slate-800">
                                         <div className="flex items-center gap-2">
+                                            <button
+                                                onClick={() => downloadReport(report)}
+                                                className="p-1.5 text-slate-400 hover:text-primary hover:bg-primary/10 rounded-md transition-colors"
+                                                title="Download Report"
+                                            >
+                                                <Download className="w-4 h-4" />
+                                            </button>
                                             <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium ${status.color} bg-current/5`}>
                                                 <StatusIcon className={`w-3.5 h-3.5 ${report.status === 'processing' ? 'animate-spin' : ''}`} />
                                                 <span>{status.label}</span>
@@ -314,6 +363,21 @@ const History = () => {
                                         animate={{ opacity: 1, height: 'auto' }}
                                         className="mt-6 pt-6 border-t border-slate-100 dark:border-slate-800 overflow-hidden"
                                     >
+                                        <div className="mb-5 grid md:grid-cols-2 gap-4">
+                                            <div className="rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/30 p-3">
+                                                <div className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">Patient Details</div>
+                                                <div className="text-sm font-semibold text-slate-900 dark:text-white mt-1">{getPatientName(report)}</div>
+                                                {report.patient_date_of_birth && <div className="text-xs text-slate-500 mt-1">DOB: {report.patient_date_of_birth}</div>}
+                                                {report.patient_gender && <div className="text-xs text-slate-500">Gender: {report.patient_gender}</div>}
+                                                {report.patient_contact_number && <div className="text-xs text-slate-500">Contact: {report.patient_contact_number}</div>}
+                                            </div>
+                                            <div className="rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/30 p-3">
+                                                <div className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">Analysis Details</div>
+                                                <div className="text-sm font-semibold text-slate-900 dark:text-white mt-1">{isXray ? 'X-Ray Analysis' : 'Lab Report Analysis'}</div>
+                                                <div className="text-xs text-slate-500 mt-1">By: {report.doctor_name || 'Doctor'}</div>
+                                                <div className="text-xs text-slate-500">Status: {report.status}</div>
+                                            </div>
+                                        </div>
                                         {isXray ? (
                                             <AnalysisResults result={report.result_data} imagePreview="" />
                                         ) : (
