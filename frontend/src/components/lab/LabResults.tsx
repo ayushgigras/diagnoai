@@ -1,146 +1,250 @@
 import type { LabResult, LabParameter } from '../../types';
-
 import { Card, CardHeader, CardTitle, CardContent } from '../common/Card';
-import { CheckCircle2, AlertCircle, HelpCircle } from 'lucide-react';
+import {
+    CheckCircle2, AlertCircle, HelpCircle, Brain, Shield,
+    AlertTriangle, TrendingUp, Activity, Beaker, ArrowDown, ArrowUp, Minus
+} from 'lucide-react';
 import { cn } from '../../lib/utils';
 
 interface LabResultsProps {
     result: LabResult;
 }
 
-const ParameterRow = ({ param }: { param: LabParameter }) => {
-    const getStatusColor = (status: string) => {
-        switch (status) {
-            case 'normal': return 'bg-green-500';
-            case 'abnormal': return 'bg-red-500';
-            case 'critical': return 'bg-red-700';
-            default: return 'bg-slate-500';
-        }
-    };
+/* ─── Status Helpers ──────────────────────────────────────────────────── */
+const STATUS_CONFIG = {
+    normal: { label: 'Normal', color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-500/10', border: 'border-emerald-500/30', bar: 'bg-emerald-500', dot: 'bg-emerald-500' },
+    abnormal: { label: 'Abnormal', color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-500/10', border: 'border-amber-500/30', bar: 'bg-amber-500', dot: 'bg-amber-500' },
+    critical: { label: 'Critical', color: 'text-red-600 dark:text-red-400', bg: 'bg-red-500/10', border: 'border-red-500/30', bar: 'bg-red-500', dot: 'bg-red-500' },
+    unknown: { label: 'Unknown', color: 'text-slate-500', bg: 'bg-slate-500/10', border: 'border-slate-500/30', bar: 'bg-slate-500', dot: 'bg-slate-500' },
+};
 
-    const getStatusIcon = (status: string) => {
-        switch (status) {
-            case 'normal': return <CheckCircle2 className="w-4 h-4 text-green-500" />;
-            case 'abnormal': return <AlertCircle className="w-4 h-4 text-red-500" />;
-            default: return <HelpCircle className="w-4 h-4 text-slate-500" />;
-        }
-    };
+function StatusBadge({ status }: { status: string }) {
+    const cfg = STATUS_CONFIG[status as keyof typeof STATUS_CONFIG] ?? STATUS_CONFIG.unknown;
+    return (
+        <span className={`inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-full ${cfg.color} ${cfg.bg} border ${cfg.border} uppercase tracking-wider`}>
+            {status === 'normal' && <CheckCircle2 className="w-3 h-3" />}
+            {status === 'abnormal' && <AlertCircle className="w-3 h-3" />}
+            {status === 'critical' && <AlertTriangle className="w-3 h-3" />}
+            {status === 'unknown' && <HelpCircle className="w-3 h-3" />}
+            {cfg.label}
+        </span>
+    );
+}
+
+function getDirectionIcon(status: string, percentage: number) {
+    if (status === 'normal') return <Minus className="w-3.5 h-3.5 text-emerald-500" />;
+    if (percentage > 60) return <ArrowUp className="w-3.5 h-3.5 text-red-500" />;
+    if (percentage < 40) return <ArrowDown className="w-3.5 h-3.5 text-red-500" />;
+    return <Minus className="w-3.5 h-3.5 text-slate-400" />;
+}
+
+/* ─── Enhanced Parameter Card ─────────────────────────────────────────── */
+const ParameterCard = ({ param }: { param: LabParameter }) => {
+    const cfg = STATUS_CONFIG[param.status as keyof typeof STATUS_CONFIG] ?? STATUS_CONFIG.unknown;
+    const markerPos = Math.min(100, Math.max(0, param.percentage));
 
     return (
-        <div className="py-4 border-b border-slate-100 dark:border-slate-800 last:border-0 hover:bg-slate-50 dark:hover:bg-slate-900/50 transition-colors px-4 -mx-4">
-            <div className="flex justify-between items-center mb-2">
-                <div className="flex items-center gap-2">
-                    {getStatusIcon(param.status)}
-                    <span className="font-medium text-slate-900 dark:text-white uppercase text-sm">{param.name}</span>
+        <div className={cn(
+            "rounded-xl border bg-white dark:bg-slate-900 p-5 transition-all hover:shadow-md",
+            param.status === 'critical' ? 'border-red-300 dark:border-red-500/30' :
+            param.status === 'abnormal' ? 'border-amber-300 dark:border-amber-500/30' :
+            'border-slate-200 dark:border-slate-800'
+        )}>
+            {/* Header Row */}
+            <div className="flex justify-between items-start mb-4">
+                <div className="flex items-center gap-3">
+                    <div className={`w-3 h-3 rounded-full ${cfg.dot} shrink-0`} />
+                    <div>
+                        <h4 className="font-bold text-slate-900 dark:text-white text-base uppercase tracking-wide">
+                            {param.name}
+                        </h4>
+                        <div className="flex items-center gap-1.5 mt-0.5">
+                            {getDirectionIcon(param.status, param.percentage)}
+                            <span className="text-xs text-slate-400">
+                                Ref: {param.reference_range}
+                            </span>
+                        </div>
+                    </div>
                 </div>
                 <div className="text-right">
-                    <span className="text-lg font-bold text-slate-900 dark:text-white">{param.value}</span>
-                    <span className="text-xs text-slate-500 ml-1">{param.unit || ''}</span>
+                    <div className="flex items-baseline gap-1.5">
+                        <span className={`text-2xl font-black ${param.status === 'normal' ? 'text-slate-900 dark:text-white' : cfg.color}`}>
+                            {param.value}
+                        </span>
+                        {param.unit && (
+                            <span className="text-xs text-slate-400 font-medium">{param.unit}</span>
+                        )}
+                    </div>
+                    <StatusBadge status={param.status} />
                 </div>
             </div>
 
-            {/* Visual Bar */}
-            <div className="relative h-2 bg-slate-100 dark:bg-slate-800 rounded-full w-full mt-2">
-                {/* Reference Range Indicator (Approximate middle 50% usually normal) */}
-                <div
-                    className="absolute top-0 bottom-0 left-[25%] right-[25%] bg-green-500/10 dark:bg-green-500/20 rounded-sm"
-                    title={`Reference: ${param.reference_range}`}
-                />
+            {/* Range Bar */}
+            <div className="relative">
+                {/* Three-zone bar */}
+                <div className="flex h-3 rounded-full overflow-hidden">
+                    <div className="w-[25%] bg-red-200 dark:bg-red-500/20" />
+                    <div className="w-[50%] bg-emerald-200 dark:bg-emerald-500/20" />
+                    <div className="w-[25%] bg-red-200 dark:bg-red-500/20" />
+                </div>
 
                 {/* Value Marker */}
                 <div
-                    className={cn("absolute top-0 bottom-0 w-2 rounded-full transition-all duration-700", getStatusColor(param.status))}
-                    style={{ left: `${Math.min(100, Math.max(0, param.percentage))}%`, transform: 'translateX(-50%)' }}
-                />
+                    className="absolute top-1/2 -translate-y-1/2 transition-all duration-700"
+                    style={{ left: `${markerPos}%`, transform: `translateX(-50%) translateY(-50%)` }}
+                >
+                    <div className={`w-4 h-4 rounded-full ${cfg.dot} border-2 border-white dark:border-slate-900 shadow-md`} />
+                </div>
             </div>
 
-            <div className="flex justify-between text-xs text-slate-400 mt-1">
-                <span>Low</span>
-                <span>Normal: {param.reference_range}</span>
-                <span>High</span>
+            {/* Range Labels */}
+            <div className="flex justify-between text-[11px] text-slate-400 mt-1.5 font-medium">
+                <span className="text-red-400">Low</span>
+                <span className="text-emerald-500 font-semibold">Normal Range</span>
+                <span className="text-red-400">High</span>
             </div>
         </div>
     );
 };
 
+/* ─── Main Component ──────────────────────────────────────────────────── */
 const LabResults = ({ result }: LabResultsProps) => {
-    return (
-        <div className="space-y-6 animate-in slide-in-from-bottom-5 fade-in duration-500">
+    const normalCount = result.parameters.filter(p => p.status === 'normal').length;
+    const abnormalCount = result.parameters.filter(p => p.status === 'abnormal').length;
+    const criticalCount = result.parameters.filter(p => p.status === 'critical').length;
+    const totalCount = result.parameters.length;
+    const isNormal = result.assessment === 'Normal';
 
-            {/* Overall Assessment */}
-            <Card className={cn(
-                "border-l-4",
-                result.assessment === 'Normal' ? "border-l-green-500" : "border-l-amber-500"
+    return (
+        <div className="space-y-8 animate-in slide-in-from-bottom-5 fade-in duration-500">
+
+            {/* ── Overall Assessment Banner ────────────────────────────── */}
+            <div className={cn(
+                "rounded-2xl p-6 border-2 shadow-lg",
+                isNormal
+                    ? "border-emerald-300 dark:border-emerald-500/30 bg-emerald-500/5 shadow-emerald-500/10"
+                    : "border-amber-300 dark:border-amber-500/30 bg-amber-500/5 shadow-amber-500/10"
             )}>
-                <CardContent className="pt-6">
-                    <div className="flex justify-between items-start">
-                        <div>
-                            <h3 className="text-lg font-bold flex items-center gap-2">
-                                Overall Status:
-                                <span className={result.assessment === 'Normal' ? "text-green-600" : "text-amber-600"}>
-                                    {result.assessment}
-                                </span>
-                            </h3>
-                            <p className="text-slate-500 text-sm mt-1">
-                                Confidence: {(result.confidence * 100).toFixed(1)}% based on analyzed parameters.
-                            </p>
-                        </div>
-                        <div className="bg-slate-100 dark:bg-slate-800 px-3 py-1 rounded text-xs font-mono">
-                            AI Analysis
-                        </div>
+                <div className="flex flex-wrap items-center gap-6">
+                    {/* Assessment Icon */}
+                    <div className={cn(
+                        "w-20 h-20 rounded-full flex items-center justify-center shrink-0",
+                        isNormal ? "bg-emerald-500/10" : "bg-amber-500/10"
+                    )}>
+                        {isNormal
+                            ? <CheckCircle2 className="w-10 h-10 text-emerald-500" />
+                            : <AlertCircle className="w-10 h-10 text-amber-500" />
+                        }
                     </div>
 
-                    {result.interpretation && (
-                        <div className="mt-4 p-4 bg-slate-50 dark:bg-slate-900 rounded-lg text-sm text-slate-700 dark:text-slate-300 italic border border-slate-100 dark:border-slate-800">
-                            "{result.interpretation}"
+                    <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-3 mb-1 flex-wrap">
+                            <h2 className={cn(
+                                "text-3xl font-black",
+                                isNormal ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400"
+                            )}>
+                                {result.assessment}
+                            </h2>
+                            <span className={cn(
+                                "text-xs font-bold px-2.5 py-1 rounded-full uppercase tracking-wider",
+                                isNormal
+                                    ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30"
+                                    : "bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/30"
+                            )}>
+                                AI Analysis
+                            </span>
                         </div>
-                    )}
-                </CardContent>
-            </Card>
-
-            <div className="grid lg:grid-cols-3 gap-8">
-                {/* Parameter Details */}
-                <div className="lg:col-span-2 space-y-4">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Detailed Parameter Analysis</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            {result.parameters.map((param, idx) => (
-                                <ParameterRow key={idx} param={param} />
-                            ))}
-                        </CardContent>
-                    </Card>
+                        <p className="text-sm text-slate-500 leading-relaxed">
+                            Confidence: <strong className="text-slate-700 dark:text-slate-300">{(result.confidence * 100).toFixed(1)}%</strong> based on {totalCount} analyzed parameters.
+                        </p>
+                    </div>
                 </div>
 
-                {/* Recommendations */}
-                <div>
-                    <Card className="sticky top-24">
-                        <CardHeader>
-                            <CardTitle className="text-lg">Recommendations</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <ul className="space-y-4">
-                                {result.recommendations?.map((rec, idx) => (
-                                    <li key={idx} className="flex gap-3 text-sm text-slate-600 dark:text-slate-300">
-                                        <CheckCircle2 className="w-5 h-5 text-secondary shrink-0" />
-                                        {rec}
-                                    </li>
-                                ))}
-                                {!result.recommendations?.length && (
-                                    <li className="text-slate-500 italic">No specific recommendations available.</li>
-                                )}
-                            </ul>
+                {/* Interpretation */}
+                {result.interpretation && (
+                    <div className="mt-5 rounded-xl bg-white/60 dark:bg-slate-900/60 backdrop-blur-sm border border-slate-200 dark:border-slate-800 p-5 flex gap-4 items-start">
+                        <div className="w-9 h-9 rounded-full bg-violet-500/10 flex items-center justify-center shrink-0">
+                            <Brain className="w-4.5 h-4.5 text-violet-500" />
+                        </div>
+                        <div>
+                            <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">AI Interpretation</div>
+                            <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed italic">
+                                "{result.interpretation}"
+                            </p>
+                        </div>
+                    </div>
+                )}
+            </div>
 
-                            <div className="mt-8 pt-6 border-t border-slate-100 dark:border-slate-800">
-                                <p className="text-xs text-slate-400">
-                                    Disclaimer: This AI analysis is for informational purposes only and does not replace professional medical advice.
-                                </p>
-                            </div>
-                        </CardContent>
-                    </Card>
+            {/* ── Stats Dashboard ─────────────────────────────────────── */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                {[
+                    { label: 'Total Parameters', value: totalCount, icon: Activity, iconColor: 'text-primary', bg: 'bg-primary/5' },
+                    { label: 'Normal', value: normalCount, icon: CheckCircle2, iconColor: 'text-emerald-500', bg: 'bg-emerald-500/5' },
+                    { label: 'Abnormal', value: abnormalCount, icon: AlertCircle, iconColor: 'text-amber-500', bg: 'bg-amber-500/5' },
+                    { label: 'Critical', value: criticalCount, icon: AlertTriangle, iconColor: 'text-red-500', bg: 'bg-red-500/5' },
+                ].map(({ label, value, icon: Icon, iconColor, bg }) => (
+                    <div key={label} className={`rounded-xl border border-slate-200 dark:border-slate-800 p-4 text-center ${bg} shadow-sm`}>
+                        <Icon className={`w-6 h-6 ${iconColor} mx-auto mb-2`} />
+                        <div className="text-3xl font-black text-slate-900 dark:text-white">{value}</div>
+                        <div className="text-[11px] text-slate-400 uppercase tracking-wider font-bold mt-1">{label}</div>
+                    </div>
+                ))}
+            </div>
+
+            {/* ── Detailed Parameter Analysis ──────────────────────────── */}
+            <div>
+                <div className="flex items-center gap-3 mb-5">
+                    <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                        <Beaker className="w-5 h-5 text-primary" />
+                    </div>
+                    <div>
+                        <h3 className="text-xl font-bold text-slate-900 dark:text-white">Detailed Parameter Analysis</h3>
+                        <p className="text-xs text-slate-400">Individual parameter breakdown with reference range visualization</p>
+                    </div>
+                </div>
+
+                <div className="grid sm:grid-cols-2 gap-4">
+                    {result.parameters.map((param, idx) => (
+                        <ParameterCard key={idx} param={param} />
+                    ))}
                 </div>
             </div>
+
+            {/* ── Recommendations ──────────────────────────────────────── */}
+            <Card>
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-lg">
+                        <Shield className="w-5 h-5 text-primary" />
+                        Recommendations
+                    </CardTitle>
+                </CardHeader>
+                <CardContent>
+                    {result.recommendations && result.recommendations.length > 0 ? (
+                        <div className="space-y-3">
+                            {result.recommendations.map((rec, idx) => (
+                                <div key={idx} className="flex gap-4 items-start p-3 rounded-lg bg-slate-50 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-800">
+                                    <div className="w-7 h-7 rounded-full bg-primary/10 text-primary flex items-center justify-center shrink-0 text-xs font-bold">
+                                        {idx + 1}
+                                    </div>
+                                    <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed">{rec}</p>
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <p className="text-slate-400 italic text-sm">No specific recommendations available.</p>
+                    )}
+
+                    <div className="mt-8 pt-5 border-t border-slate-100 dark:border-slate-800">
+                        <div className="rounded-xl bg-amber-50 dark:bg-amber-500/5 border border-amber-200 dark:border-amber-500/20 p-4 flex gap-3 items-start">
+                            <AlertTriangle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
+                            <p className="text-sm text-amber-800 dark:text-amber-300">
+                                <strong>Disclaimer:</strong> This AI analysis is for informational purposes only and does not replace professional medical advice.
+                            </p>
+                        </div>
+                    </div>
+                </CardContent>
+            </Card>
         </div>
     );
 };

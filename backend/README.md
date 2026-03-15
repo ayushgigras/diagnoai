@@ -13,12 +13,12 @@ FastAPI backend for DiagnoAI application.
 Create `backend/.env` with:
 
 ```env
-JWT_SECRET_KEY=your-long-random-secret
-GEMINI_API_KEY=your-gemini-api-key
-DATABASE_URL=postgresql://postgres:your_strong_password@localhost:5432/diagnoai
+JWT_SECRET_KEY=<YOUR_JWT_SECRET_KEY>
+GEMINI_API_KEY=<YOUR_GEMINI_API_KEY>
+DATABASE_URL=postgresql://postgres:<YOUR_DB_PASSWORD>@localhost:5432/diagnoai
 CELERY_BROKER_URL=redis://localhost:6379/0
 CELERY_RESULT_BACKEND=redis://localhost:6379/1
-ADMIN_REGISTRATION_KEY=your-admin-secret-key
+ADMIN_REGISTRATION_KEY=<YOUR_ADMIN_SECRET_KEY>
 ```
 
 `JWT_SECRET_KEY` is required at startup in production (a dev fallback is used automatically when `APP_ENV=development`). `ADMIN_REGISTRATION_KEY` is always required and gates admin-role self-registration.

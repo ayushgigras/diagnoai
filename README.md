@@ -106,12 +106,12 @@ pip install -r requirements.txt
 Create `backend/.env`:
 
 ```env
-JWT_SECRET_KEY=your-long-random-secret
-GEMINI_API_KEY=your-gemini-api-key
-DATABASE_URL=postgresql://postgres:your_strong_password@localhost:5432/diagnoai
+JWT_SECRET_KEY=<YOUR_JWT_SECRET_KEY>
+GEMINI_API_KEY=<YOUR_GEMINI_API_KEY>
+DATABASE_URL=postgresql://postgres:<YOUR_DB_PASSWORD>@localhost:5432/diagnoai
 CELERY_BROKER_URL=redis://localhost:6379/0
 CELERY_RESULT_BACKEND=redis://localhost:6379/1
-ADMIN_REGISTRATION_KEY=your-admin-secret-key
+ADMIN_REGISTRATION_KEY=<YOUR_ADMIN_SECRET_KEY>
 APP_ENV=development
 ```
 
@@ -228,6 +228,12 @@ Tests cover:
 - Background analysis (`/api/lab/analyze-from-file`) uses Celery + Redis. X-ray analysis operates synchronously.
 - `patient_id` can be passed in analyze requests; if omitted, backend resolves a fallback patient.
 - New self-registrations default to the `patient` role. To register as `admin`, supply `admin_secret` matching `ADMIN_REGISTRATION_KEY` in the request body.
+
+## UI Features
+
+- **📊 X-Ray Analysis Dashboard**: SVG confidence ring, 4-stat summary row (Prediction, Confidence, Findings, Severity), auto-expanded XAI explainability cards with numbered steps, full probability distribution with highlighted primary prediction, and Grad-CAM heatmap visualization.
+- **🧪 Lab Analysis Dashboard**: Assessment banner with AI interpretation callout, 4-stat dashboard (Total, Normal, Abnormal, Critical), individual parameter cards with 3-zone gauge bars (Low/Normal/High), direction arrows, and numbered recommendation cards.
+- **📥 PDF Report Generation**: Downloadable diagnostic reports using jsPDF with auto-table formatting, severity-colored badges, structured findings tables, and XAI explainability sections. Supports both X-Ray and Lab report formats.
 
 ## AI Capabilities
 
