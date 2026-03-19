@@ -1,45 +1,81 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
-import useAuthStore from '../store/useAuthStore';
+import { useState, useEffect, useRef, useCallback } from 'react';
 
-// Derive WebSocket URL from API URL
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
-const WS_URL = API_URL.replace(/^http/, 'ws').replace(/\/api\/?$/, '');
-
-export function useWebSocket() {
+const useWebSocket = (clientId: string) => {
     const [messages, setMessages] = useState<string[]>([]);
-    const [isConnected, setIsConnected] = useState(false);
-    const token = useAuthStore(state => state.token);
-    const ws = useRef<WebSocket | null>(null);
+    const [isConnected, setIsConnected] = useState<boolean>(false);
+    
+    const wsRef = useRef<WebSocket | null>(null);
+    const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const retryCountRef = useRef<number>(0);
 
     const connect = useCallback(() => {
-        if (!token) return;
-        
-        ws.current = new WebSocket(`${WS_URL}/api/ws/notifications?token=${token}`);
-        
-        ws.current.onopen = () => setIsConnected(true);
-        
-        ws.current.onmessage = (event) => {
-            setMessages(prev => [...prev, event.data]);
+        if (!clientId) return;
+
+        if (wsRef.current) {
+            wsRef.current.close();
+            wsRef.current = null;
+        }
+
+        const baseUrl = import.meta.env.VITE_WS_URL || 'ws://localhost:8000/api/ws';
+        // Ensure only one slash between baseUrl and clientId
+        const wsUrl = `${baseUrl.replace(/\/$/, '')}/${clientId}`;
+
+        const ws = new WebSocket(wsUrl);
+        wsRef.current = ws;
+
+        ws.onopen = () => {
+            setIsConnected(true);
+            retryCountRef.current = 0; // Reset backoff on success
         };
-        
-        ws.current.onclose = () => {
+
+        ws.onmessage = (event: MessageEvent) => {
+            setMessages((prev) => [...prev, event.data]);
+        };
+
+        ws.onclose = () => {
             setIsConnected(false);
-            // Reconnect after 3 seconds unless token is gone
-            if (useAuthStore.getState().token) {
-                setTimeout(connect, 3000);
+            wsRef.current = null;
+
+            // Exponential backoff: 1s, 2s, 4s, ..., max 30s
+            const delay = Math.min(1000 * Math.pow(2, retryCountRef.current), 30000);
+            retryCountRef.current += 1;
+
+            reconnectTimeoutRef.current = setTimeout(() => {
+                connect();
+            }, delay);
+        };
+
+        ws.onerror = (error: Event) => {
+            console.error('WebSocket error:', error);
+            // Closing the socket triggers onclose which handles the reconnection
+            if (ws.readyState !== WebSocket.CLOSED) {
+                 ws.close();
             }
         };
-    }, [token]);
+    }, [clientId]);
 
     useEffect(() => {
         connect();
+
         return () => {
-            if (ws.current) {
-                ws.current.onclose = null; // Prevent reconnect on deliberate cleanup
-                ws.current.close();
+            if (reconnectTimeoutRef.current) {
+                clearTimeout(reconnectTimeoutRef.current);
+            }
+            if (wsRef.current) {
+                wsRef.current.close();
             }
         };
     }, [connect]);
 
-    return { messages, isConnected };
-}
+    const clearMessages = useCallback(() => {
+        setMessages([]);
+    }, []);
+
+    return {
+        messages,
+        isConnected,
+        clearMessages
+    };
+};
+
+export default useWebSocket;
