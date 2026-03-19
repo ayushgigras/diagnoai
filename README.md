@@ -221,6 +221,36 @@ Tests cover:
 - App component rendering
 - Navigation structure
 
+## Troubleshooting
+
+- **"CSRF token missing" error**: Clear cookies and reload the page.
+- **Celery worker not connecting**: Check that Redis is running on port 6379.
+- **Database connection error**: Verify `DATABASE_URL` in `.env` and that `docker compose` is running.
+- **TorchXRayVision model slow on first load**: The model is cached after the first inference; subsequent calls are fast.
+- **Frontend showing CORS error**: Verify `VITE_API_URL` matches the backend URL and `BACKEND_CORS_ORIGINS` includes the frontend URL.
+
+## Environment Variables
+
+| Variable | Description | Required | Example |
+|---|---|---|---|
+| JWT_SECRET_KEY | Secret for signing JWT tokens | Yes (prod) | random 32+ char string |
+| GEMINI_API_KEY | Google Gemini API key for lab OCR | Yes | AIza... |
+| DATABASE_URL | PostgreSQL connection string | Yes | postgresql://... |
+| CELERY_BROKER_URL | Redis URL for Celery | Yes | redis://localhost:6379/0 |
+| CELERY_RESULT_BACKEND | Redis URL for results | Yes | redis://localhost:6379/1 |
+| ADMIN_REGISTRATION_KEY | Secret to register admin accounts | Yes | random string |
+| APP_ENV | Environment (development/production) | No | development |
+| RATELIMIT_ENABLED | Enable/disable rate limiting | No | true |
+| ALLOWED_HOSTS | Comma-separated allowed hostnames | No | localhost,127.0.0.1 |
+| BACKEND_CORS_ORIGINS | Allowed frontend origins | No | http://localhost:5173 |
+
+## Known Limitations
+
+- Mobile layout not fully optimized (planned improvement)
+- WebSocket reconnection is manual (handled by useWebSocket hook)
+- X-Ray model supports chest X-rays only currently
+- Lab report OCR accuracy depends on image quality
+
 ## Notes
 
 - Auth is JWT-based. `JWT_SECRET_KEY` is required in production (a dev fallback is used automatically when `APP_ENV=development`).

@@ -25,6 +25,9 @@ app = FastAPI(
     version=settings.PROJECT_VERSION,
 )
 
+if settings.APP_ENV == "production" and "*" in settings.BACKEND_CORS_ORIGINS:
+    raise RuntimeError("CORS cannot allow wildcard '*' in production.")
+
 app.state.limiter = limiter
 if ratelimit_enabled:
     app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
@@ -45,7 +48,8 @@ async def add_security_headers(request: Request, call_next):
 # --------------- CSRF Middleware ---------------
 @app.middleware("http")
 async def csrf_middleware(request: Request, call_next):
-    if request.method in ["POST", "PUT", "DELETE", "PATCH"]:
+    CSRF_EXEMPT_PATHS = ["/api/auth/login", "/api/auth/register", "/api/health", "/"]
+    if request.method in ["POST", "PUT", "DELETE", "PATCH"] and request.url.path not in CSRF_EXEMPT_PATHS:
         csrf_token = request.headers.get("x-csrf-token")
         cookie_token = request.cookies.get("csrf_token")
         if not csrf_token or not cookie_token or csrf_token != cookie_token:
@@ -59,7 +63,7 @@ async def csrf_middleware(request: Request, call_next):
             value=secrets.token_urlsafe(32),
             httponly=False,
             samesite="lax",
-            secure=False
+            secure=settings.APP_ENV == "production"
         )
     return response
 
@@ -91,7 +95,7 @@ app.include_router(admin.router, prefix="/api/admin", tags=["Admin"])
 # --------------- Static Files ---------------
 UPLOAD_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "uploads")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
-app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
+
 
 
 @app.get("/api/health")

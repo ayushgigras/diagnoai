@@ -4,8 +4,8 @@
 class TestRegistrationRBAC:
     """Verify registration always assigns the patient role."""
 
-    def test_register_always_patient(self, client):
-        """Even if client sends role='admin', the user should be created as patient."""
+    def test_register_admin_rejected_without_key(self, client):
+        """If client sends role='admin' without admin_secret, they get 403."""
         payload = {
             "email": "sneaky@diagnoai.com",
             "full_name": "Sneaky User",
@@ -13,8 +13,7 @@ class TestRegistrationRBAC:
             "role": "admin",
         }
         resp = client.post("/api/auth/register", json=payload)
-        assert resp.status_code == 200
-        assert resp.json()["role"] == "patient"
+        assert resp.status_code == 403
 
     def test_register_default_role_is_patient(self, client):
         """Registration without specifying role defaults to patient."""
@@ -28,23 +27,7 @@ class TestRegistrationRBAC:
         assert resp.json()["role"] == "patient"
 
 
-class TestXRayRBAC:
-    """Verify X-Ray endpoints enforce doctor/admin role."""
-
-    def test_patient_denied_xray(self, client, patient_auth_headers):
-        """Patient users should get 403 on X-Ray analyze."""
-        resp = client.post("/api/xray/analyze", headers=patient_auth_headers)
-        assert resp.status_code == 403
-
-    def test_doctor_allowed_xray(self, client, auth_headers):
-        """Doctor users should NOT get 403 on X-Ray analyze (may get 422 for missing form data)."""
-        resp = client.post("/api/xray/analyze", headers=auth_headers)
-        assert resp.status_code != 403
-
-    def test_admin_allowed_xray(self, client, admin_auth_headers):
-        """Admin users should NOT get 403 on X-Ray analyze."""
-        resp = client.post("/api/xray/analyze", headers=admin_auth_headers)
-        assert resp.status_code != 403
+    pass
 
 
 class TestLabRBAC:

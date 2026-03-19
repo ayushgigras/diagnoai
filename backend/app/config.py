@@ -8,7 +8,8 @@ class Settings(BaseSettings):
     
     PROJECT_NAME: str = "DiagnoAI"
     PROJECT_VERSION: str = "1.0.0"
-    BACKEND_CORS_ORIGINS: List[str] = ["http://localhost:5173", "http://localhost:3000", "http://127.0.0.1:5173"]
+    APP_ENV: str = "development"
+    BACKEND_CORS_ORIGINS: List[str] = ["http://localhost:5173", "http://localhost:8501"]
     ALLOWED_HOSTS: Union[List[str], str] = ["localhost", "127.0.0.1"]
     
     # Environment API Keys

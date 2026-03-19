@@ -25,6 +25,12 @@ async def analyze_xray(
     db: Session = Depends(get_db)
 ):
     try:
+        if current_user.role == "admin":
+            raise HTTPException(
+                status_code=403,
+                detail="Admins should not perform diagnostic analysis. Use a doctor or patient account."
+            )
+
         # 1. Validate and save file securely
         file_path = validate_and_save_upload(file, is_xray=True)
 

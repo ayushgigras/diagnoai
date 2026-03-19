@@ -17,8 +17,12 @@ async def get_user_from_token(token: str):
         return None
 
 @router.websocket("/ws/notifications")
-async def websocket_endpoint(websocket: WebSocket, token: str):
+async def websocket_endpoint(websocket: WebSocket, token: str = None):
     await websocket.accept()
+    if not token:
+        await websocket.close(code=1008)
+        return
+        
     user_id = await get_user_from_token(token)
     if not user_id:
         await websocket.close(code=1008)

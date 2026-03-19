@@ -15,7 +15,7 @@ const ProtectedRoute = ({ allowedRoles }: ProtectedRouteProps) => {
     }
 
     // If allowedRoles is specified and user's role is not included, redirect to home
-    if (allowedRoles && userRole && !allowedRoles.includes(userRole)) {
+    if (allowedRoles && (!userRole || !allowedRoles.includes(userRole))) {
         return <Navigate to="/" replace />;
     }
 

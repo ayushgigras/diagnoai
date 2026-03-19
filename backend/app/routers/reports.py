@@ -1,6 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from typing import List
+import os
 
 from ..database import get_db
 from ..models.report import Report
@@ -54,3 +56,14 @@ def delete_report(
     db.delete(report)
     db.commit()
     return {"message": "Report deleted successfully"}
+
+@router.get("/uploads/{filename}")
+async def serve_upload(
+    filename: str, 
+    current_user: User = Depends(get_current_user)
+):
+    UPLOAD_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "uploads")
+    file_path = os.path.join(UPLOAD_DIR, filename)
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404)
+    return FileResponse(file_path)

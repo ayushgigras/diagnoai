@@ -28,7 +28,13 @@ const useAuthStore = create<AuthState>((set) => {
     const storedUser = localStorage.getItem('diagnoai_user');
 
     const initialToken = storedToken ? storedToken : null;
-    const initialUser = storedUser ? JSON.parse(storedUser) : null;
+    let initialUser = null;
+    try {
+        initialUser = storedUser ? JSON.parse(storedUser) : null;
+    } catch {
+        localStorage.removeItem('diagnoai_user');
+        localStorage.removeItem('diagnoai_token');
+    }
 
     return {
         token: initialToken,

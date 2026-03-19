@@ -13,6 +13,7 @@ import Profile from './pages/Profile';
 import AdminDashboard from './pages/AdminDashboard';
 import ProtectedRoute from './components/common/ProtectedRoute';
 import NotificationsHelper from './components/common/NotificationsHelper';
+import ErrorBoundary from './components/common/ErrorBoundary';
 import api from './services/api';
 
 function App() {
@@ -22,44 +23,46 @@ function App() {
   }, []);
 
   return (
-    <Router>
-      <div className="flex flex-col min-h-screen">
-        <Navbar />
-        <main className="flex-grow bg-background-light dark:bg-background-dark">
-          <Routes>
-            <Route path="/" element={<Home />} />
-            <Route path="/login" element={<Login />} />
-            <Route path="/register" element={<Register />} />
-            <Route path="/about" element={<About />} />
+    <ErrorBoundary>
+      <Router>
+        <div className="flex flex-col min-h-screen">
+          <Navbar />
+          <main className="flex-grow bg-background-light dark:bg-background-dark">
+            <Routes>
+              <Route path="/" element={<Home />} />
+              <Route path="/login" element={<Login />} />
+              <Route path="/register" element={<Register />} />
+              <Route path="/about" element={<About />} />
 
-            {/* Protected Routes - patient & doctor only */}
-            <Route element={<ProtectedRoute allowedRoles={["patient", "doctor"]} />}>
-              <Route path="/lab" element={<LabAnalysis />} />
-              <Route path="/xray" element={<XRayAnalysis />} />
-              <Route path="/history" element={<History />} />
-            </Route>
+              {/* Protected Routes - patient & doctor only */}
+              <Route element={<ProtectedRoute allowedRoles={["patient", "doctor"]} />}>
+                <Route path="/lab" element={<LabAnalysis />} />
+                <Route path="/xray" element={<XRayAnalysis />} />
+                <Route path="/history" element={<History />} />
+              </Route>
 
-            {/* Common Protected Routes */}
-            <Route element={<ProtectedRoute />}>
-              <Route path="/profile" element={<Profile />} />
-            </Route>
+              {/* Common Protected Routes */}
+              <Route element={<ProtectedRoute />}>
+                <Route path="/profile" element={<Profile />} />
+              </Route>
 
-            {/* Admin only */}
-            <Route element={<ProtectedRoute allowedRoles={["admin"]} />}>
-              <Route path="/admin" element={<AdminDashboard />} />
-            </Route>
+              {/* Admin only */}
+              <Route element={<ProtectedRoute allowedRoles={["admin"]} />}>
+                <Route path="/admin" element={<AdminDashboard />} />
+              </Route>
 
-            <Route path="*" element={
-              <div className="flex items-center justify-center h-full min-h-[50vh]">
-                <h1 className="text-2xl text-slate-500">404 - Page Not Found</h1>
-              </div>
-            } />
-          </Routes>
-        </main>
-        <NotificationsHelper />
-        <Footer />
-      </div>
-    </Router>
+              <Route path="*" element={
+                <div className="flex items-center justify-center h-full min-h-[50vh]">
+                  <h1 className="text-2xl text-slate-500">404 - Page Not Found</h1>
+                </div>
+              } />
+            </Routes>
+          </main>
+          <NotificationsHelper />
+          <Footer />
+        </div>
+      </Router>
+    </ErrorBoundary>
   );
 }
 
