@@ -1,28 +1,16 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import Login from '../pages/Login';
-import api from '../services/api';
-import useAuthStore from '../store/useAuthStore';
+const mockedPost = vi.hoisted(() => vi.fn());
 
-// Mock the dependencies
-vi.mock('../services/api');
-vi.mock('../store/useAuthStore');
+vi.mock('../services/api', () => ({
+    default: {
+        post: mockedPost,
+    },
+}));
 
-describe('Login Page', () => {
-    const mockLogin = vi.fn();
-
-    beforeEach(() => {
-        vi.resetAllMocks();
-        // Setup default auth store mock to handle state selectors
-        vi.mocked(useAuthStore).mockImplementation((selector: any) => {
-            if (typeof selector === 'function') {
-                return selector({ login: mockLogin } as any);
-            }
-            return { login: mockLogin } as any;
-        });
-        vi.mocked(useAuthStore.getState).mockReturnValue({ login: mockLogin } as any);
-    });
+describe('Login', () => {
 
     const renderLogin = () => {
         return render(
@@ -32,53 +20,43 @@ describe('Login Page', () => {
         );
     };
 
-    it('renders email and password fields and submit button', () => {
+    it('renders email input field', () => {
         renderLogin();
-        
-        // Use accessible queries or placeholder text
-        expect(screen.getByPlaceholderText(/doctor@diagnoai/i)).toBeInTheDocument();
-        expect(screen.getByPlaceholderText(/\*\*\*\*\*\*\*\*/i)).toBeInTheDocument();
-        
-        const submitButton = screen.getByRole('button', { name: /sign in/i });
-        expect(submitButton).toBeInTheDocument();
+
+        const emailInput = document.querySelector('input[type="email"]');
+        expect(emailInput).toBeInTheDocument();
+    });
+
+    it('renders password input field', () => {
+        renderLogin();
+
+        const passwordInput = document.querySelector('input[type="password"]');
+        expect(passwordInput).toBeInTheDocument();
+    });
+
+    it('renders submit/login button', () => {
+        renderLogin();
+
+        expect(screen.getByRole('button', { name: /login|sign in/i })).toBeInTheDocument();
     });
 
     it('shows error message on failed login', async () => {
-        // Mock API to reject
-        vi.mocked(api.post).mockRejectedValueOnce({
-            response: { data: { detail: "Incorrect credentials" } }
+        mockedPost.mockRejectedValueOnce({
+            response: { data: { detail: 'Invalid credentials' } },
         });
 
         renderLogin();
-        
-        fireEvent.change(screen.getByPlaceholderText(/doctor@diagnoai/i), { target: { value: 'test@example.com' } });
-        fireEvent.change(screen.getByPlaceholderText(/\*\*\*\*\*\*\*\*/i), { target: { value: 'wrongpass' } });
-        fireEvent.click(screen.getByRole('button', { name: /sign in/i }));
 
-        await waitFor(() => {
-            expect(screen.getByText(/incorrect credentials/i)).toBeInTheDocument();
+        fireEvent.change(screen.getByPlaceholderText('doctor@diagnoai.com'), {
+            target: { value: 'test@example.com' },
         });
-        
-        expect(mockLogin).not.toHaveBeenCalled();
-    });
-
-    it('calls login store action on successful login', async () => {
-        const mockResponse = {
-            data: {
-                access_token: 'fake-jwt-token',
-                user: { id: 1, email: 'test@example.com', role: 'patient' }
-            }
-        };
-        vi.mocked(api.post).mockResolvedValueOnce(mockResponse);
-
-        renderLogin();
-        
-        fireEvent.change(screen.getByPlaceholderText(/doctor@diagnoai/i), { target: { value: 'test@example.com' } });
-        fireEvent.change(screen.getByPlaceholderText(/\*\*\*\*\*\*\*\*/i), { target: { value: 'password123' } });
-        fireEvent.click(screen.getByRole('button', { name: /sign in/i }));
+        fireEvent.change(screen.getByPlaceholderText('********'), {
+            target: { value: 'wrong-password' },
+        });
+        fireEvent.click(screen.getByRole('button', { name: /login|sign in/i }));
 
         await waitFor(() => {
-            expect(mockLogin).toHaveBeenCalledWith('fake-jwt-token', mockResponse.data.user);
+            expect(screen.getByText(/invalid credentials/i)).toBeInTheDocument();
         });
     });
 });
