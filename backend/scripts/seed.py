@@ -1,3 +1,7 @@
+import sys
+import os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from app.database import SessionLocal
 from app.models.patient import Patient
 from app.models.user import User

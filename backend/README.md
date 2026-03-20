@@ -52,6 +52,10 @@ ADMIN_REGISTRATION_KEY=<YOUR_ADMIN_SECRET_KEY>
   ```bash
   alembic upgrade head
   ```
+- To seed the database with initial users:
+  ```bash
+  python scripts/seed.py
+  ```
 
 ## API Documentation
 
