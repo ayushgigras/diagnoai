@@ -5,10 +5,11 @@ DiagnoAI is a full-stack AI-powered diagnostic system designed to assist healthc
 ## Features
 
 - **🔬 X-Ray Analysis**: Automated detection of conditions like Pneumonia, COVID-19, and Fractures from X-ray images using deep learning (TorchXRayVision), processing synchronously for immediate results.
-- **🧪 Lab Report Analysis**: Intelligent parsing of PDF/Image lab reports using OCR (Google Gemini Vision), with automatic interpretation of values against reference ranges.
-- **📝 Intelligent Insights**: Confidence scores, probability distributions, and clinical recommendations.
-- **🔒 Secure by Design**: JWT authentication, CSRF protection, bcrypt password hashing, rate limiting, security headers, input validation, and role-based access control.
-- **📊 Report History**: Persistent report storage with per-user history via PostgreSQL.
+- **🧪 Lab Report Analysis**: Intelligent parsing of PDF/Image lab reports using OCR (Google Gemini Vision), with automatic interpretation of values against reference ranges and clinical flags (H/L/*).
+- **📝 Intelligent Insights**: Confidence scores, probability distributions, and plain-English clinical recommendations.
+- **🔒 Secure by Design**: JWT authentication, CSRF protection, bcrypt password hashing, rate limiting, security headers, input validation, and role-based access control (RBAC).
+- **📊 Report History**: Persistent report storage with per-user history and patient identification for registered users.
+- **🛠️ Admin Control**: User activation/deactivation, role management, and bulk report deletion.
 - **⚡ Background Processing**: Long-running Lab OCR tasks run asynchronously via Celery + Redis.
 - **🔔 Real-time Notifications**: WebSockets-based real-time updates for background tasks and system alerts.
 
@@ -166,9 +167,11 @@ Opens at `http://localhost:8501`. Ensure the backend API server is running on po
 | POST   | `/api/lab/analyze-from-file`| Yes| Upload & analyze lab report end-to-end|
 | GET    | `/api/tasks/status/{id}`  | Yes  | Check background task status         |
 | GET    | `/api/reports/history`    | Yes  | Get authenticated user's report history|
+| DELETE | `/api/reports/{id}`       | Yes* | Delete a report (Owner or Admin only) |
 | WS     | `/api/ws/{client_id}`     | No*  | Connect to WebSocket notifications   |
 | GET    | `/api/admin/users`        | Admin| List all users                       |
 | PATCH  | `/api/admin/users/{id}/role`| Admin| Update a user's role               |
+| PATCH  | `/api/admin/users/{id}/status`| Admin| Activate/Deactivate a user         |
 | DELETE | `/api/admin/users/{id}`   | Admin| Delete a user                        |
 | GET    | `/api/health`             | No   | Health check                         |
 

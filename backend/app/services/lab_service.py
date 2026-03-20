@@ -23,6 +23,7 @@ def analyze_lab_values(values: list):
             "value": item.get("result_value", 0),
             "unit": item.get("unit", ""),
             "reference_range": item.get("reference_range", "N/A"),
+            "flag": item.get("flag", ""),
             "status": "unknown",
             "percentage": 50
         })
@@ -49,19 +50,21 @@ def analyze_lab_values(values: list):
             
             prompt = f"""
             Act as an expert medical AI assistant. Analyze the following laboratory test parameters.
-            For each parameter, look at the extracted `value` and its printed `reference_range`.
+            For each parameter, look at the extracted `value`, its printed `reference_range`, and any `flag` (like H, L, or Abnormal).
             
-            Determine if each parameter is "normal", "abnormal", or "critical" based STRICTLY on its accompanied reference range.
+            Determine if each parameter is "normal", "abnormal", or "critical" based on the reference range and flags.
+            - If a value is "Negative" but the range is "Negative", it is "normal".
+            - If there is an 'H' or 'L' flag, it is likely "abnormal" or "critical".
             
             Based on the individual parameters, determine the `overall_assessment` using these strict guidelines:
-            - "Normal": All parameters are strictly within their reference ranges.
-            - "Borderline": 1 or 2 parameters are slightly outside the normal range, but the deviation is minor and clinically insignificant in the overall healthy picture.
+            - "Normal": All parameters are strictly within their reference ranges or are qualitative negatives where appropriate.
+            - "Borderline": 1 or 2 parameters are slightly outside the normal range, but the deviation is minor and clinically insignificant.
             - "Abnormal": Multiple parameters are notably out of range, or a key parameter indicates a clear clinical abnormality.
-            - "Critical": One or more values are dangerously out of bounds and require immediate medical attention.
+            - "Critical": One or more values are dangerously out of bounds or flagged as high-risk and require immediate medical attention.
 
             Also provide a short, easy-to-understand clinical interpretation of the OVERALL results in 2-3 sentences. 
-            CRITICAL: The interpretation MUST be written in plain, patient-friendly English. Avoid dense medical jargon, but maintain a professional and reassuring tone. Do not use overly childish analogies (e.g. avoid saying 'tiny little buses'). Explain abnormal findings clearly and simply.
-            Finally, provide an array of 1-3 short, actionable recommendations (also in simple, non-technical English).
+            CRITICAL: The interpretation MUST be written in plain, patient-friendly English. Explain abnormal findings clearly and simply.
+            Finally, provide an array of 1-3 short, actionable recommendations.
             
             Format your response STRICTLY as JSON with these exact keys:
             {{

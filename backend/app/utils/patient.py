@@ -65,11 +65,37 @@ def resolve_or_create_patient_id(
     db: Session,
     patient_id: Optional[int] = None,
     patient_details: Optional[Dict[str, Any]] = None,
+    current_user: Optional[Any] = None  # Using Any to avoid circular import with User model if needed
 ) -> int:
     if patient_id is not None:
         return resolve_patient_id(db, patient_id)
 
     if patient_details:
         return create_patient_from_details(db, patient_details)
+
+    # If the current user is a patient, use their own identity
+    if current_user and hasattr(current_user, 'role') and current_user.role == "patient":
+        name_parts = current_user.full_name.split(" ", 1) if current_user.full_name else ["Unknown", "User"]
+        first_name = name_parts[0]
+        last_name = name_parts[1] if len(name_parts) > 1 else "Patient"
+        
+        # Look for existing patient record with this name
+        existing_patient = (
+            db.query(Patient)
+            .filter(Patient.first_name == first_name, Patient.last_name == last_name)
+            .first()
+        )
+        if existing_patient:
+            return existing_patient.id
+            
+        # Create new patient record for this user
+        new_patient = Patient(
+            first_name=first_name,
+            last_name=last_name,
+        )
+        db.add(new_patient)
+        db.commit()
+        db.refresh(new_patient)
+        return new_patient.id
 
     return resolve_patient_id(db, None)

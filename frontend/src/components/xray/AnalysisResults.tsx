@@ -6,6 +6,7 @@ import {
     Brain, Microscope, Stethoscope, ChevronDown, ChevronUp,
     Info, AlertTriangle, CheckCircle2, Zap, Shield, Target, TrendingUp
 } from 'lucide-react';
+import FeedbackForm from '../common/FeedbackForm';
 
 interface AnalysisResultsProps {
     result: XRayResult;
@@ -13,11 +14,11 @@ interface AnalysisResultsProps {
 }
 
 const SEVERITY_CONFIG = {
-    normal: { label: 'Normal', color: 'text-emerald-500', bg: 'bg-emerald-500/10', bar: 'bg-emerald-500', border: 'border-emerald-500/30', glow: 'shadow-emerald-500/20' },
-    low: { label: 'Low', color: 'text-blue-400', bg: 'bg-blue-400/10', bar: 'bg-blue-400', border: 'border-blue-400/30', glow: 'shadow-blue-400/20' },
-    moderate: { label: 'Moderate', color: 'text-amber-400', bg: 'bg-amber-400/10', bar: 'bg-amber-400', border: 'border-amber-400/30', glow: 'shadow-amber-400/20' },
-    high: { label: 'High', color: 'text-orange-500', bg: 'bg-orange-500/10', bar: 'bg-orange-500', border: 'border-orange-500/30', glow: 'shadow-orange-500/20' },
-    critical: { label: 'Critical', color: 'text-red-500', bg: 'bg-red-500/10', bar: 'bg-red-500', border: 'border-red-500/30', glow: 'shadow-red-500/20' },
+    normal: { label: 'Normal', color: 'text-emerald-500', bg: 'bg-emerald-500/10', bar: 'bg-emerald-500', border: 'border-emerald-500/30', glow: 'shadow-emerald-500/20', hex: '#10b981' },
+    low: { label: 'Low', color: 'text-blue-400', bg: 'bg-blue-400/10', bar: 'bg-blue-400', border: 'border-blue-400/30', glow: 'shadow-blue-400/20', hex: '#60a5fa' },
+    moderate: { label: 'Moderate', color: 'text-amber-400', bg: 'bg-amber-400/10', bar: 'bg-amber-400', border: 'border-amber-400/30', glow: 'shadow-amber-400/20', hex: '#fbbf24' },
+    high: { label: 'High', color: 'text-orange-500', bg: 'bg-orange-500/10', bar: 'bg-orange-500', border: 'border-orange-500/30', glow: 'shadow-orange-500/20', hex: '#f97316' },
+    critical: { label: 'Critical', color: 'text-red-500', bg: 'bg-red-500/10', bar: 'bg-red-500', border: 'border-red-500/30', glow: 'shadow-red-500/20', hex: '#ef4444' },
 };
 
 /* ─── Severity Badge ──────────────────────────────────────────────────── */
@@ -59,8 +60,8 @@ function ConfidenceRing({ value, color }: { value: number; color: string }) {
 }
 
 /* ─── XAI Explanation Card ────────────────────────────────────────────── */
-function XAICard({ condition, detail, defaultOpen = false, index }: {
-    condition: string; detail: XAIDetail; defaultOpen?: boolean; index: number;
+function XAICard({ condition, detail, defaultOpen = false }: {
+    condition: string; detail: XAIDetail; defaultOpen?: boolean;
 }) {
     const [expanded, setExpanded] = useState(defaultOpen);
     const cfg = SEVERITY_CONFIG[detail.severity] ?? SEVERITY_CONFIG.moderate;
@@ -74,7 +75,7 @@ function XAICard({ condition, detail, defaultOpen = false, index }: {
 
     return (
         <div className={`rounded-xl border-l-4 ${cfg.border} bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm hover:shadow-md transition-shadow`}
-            style={{ borderLeftColor: cfg.bar.replace('bg-', '').includes('emerald') ? '#10b981' : cfg.bar.includes('blue') ? '#60a5fa' : cfg.bar.includes('amber') ? '#fbbf24' : cfg.bar.includes('orange') ? '#f97316' : '#ef4444' }}>
+            style={{ borderLeftColor: cfg.hex }}>
             <button
                 className="w-full flex items-center justify-between p-5 text-left hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
                 onClick={() => setExpanded(e => !e)}
@@ -142,11 +143,9 @@ function XAICard({ condition, detail, defaultOpen = false, index }: {
 
 /* ─── Main Component ──────────────────────────────────────────────────── */
 const AnalysisResults = ({ result, imagePreview }: AnalysisResultsProps) => {
-    const heatmapSrc = result.heatmap_b64
-        ? `data:image/png;base64,${result.heatmap_b64}`
-        : result.heatmap_base64
-            ? `data:image/png;base64,${result.heatmap_base64}`
-            : null;
+    const heatmapSrc = (result.heatmap_b64 || result.heatmap_base64)
+        ? `data:image/png;base64,${result.heatmap_b64 || result.heatmap_base64}`
+        : null;
 
     const primarySeverity = result.findings?.[0]?.severity ?? 'moderate';
     const cfg = SEVERITY_CONFIG[primarySeverity] ?? SEVERITY_CONFIG.moderate;
@@ -301,19 +300,25 @@ const AnalysisResults = ({ result, imagePreview }: AnalysisResultsProps) => {
                                 const pct = Math.min(score * 100, 100);
                                 return (
                                     <div key={condition}
-                                        className={`flex items-center gap-4 text-sm p-3 rounded-lg transition-colors ${idx % 2 === 0 ? 'bg-slate-50 dark:bg-slate-900/50' : ''}`}>
-                                        <div className={`w-2 h-8 rounded-full ${scfg.bar} shrink-0`} />
-                                        <span className={`w-40 font-semibold shrink-0 ${scfg.color}`}>{condition}</span>
-                                        <div className="flex-1 h-3 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                                        className={`flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-sm p-3 rounded-lg transition-colors ${idx % 2 === 0 ? 'bg-slate-50 dark:bg-slate-900/50' : ''}`}>
+                                        <div className="flex items-center gap-3 flex-1 sm:flex-none">
+                                            <div className={`w-2 h-6 sm:h-8 rounded-full ${scfg.bar} shrink-0`} />
+                                            <span className={`w-32 sm:w-40 font-semibold truncate ${scfg.color}`}>{condition}</span>
+                                        </div>
+                                        <div className="flex items-center gap-3 flex-1 w-full">
+                                            <div className="flex-1 h-3 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
                                             <div
                                                 className={`h-full ${scfg.bar} rounded-full transition-all duration-700`}
                                                 style={{ width: `${pct}%` }}
                                             />
+                                            </div>
+                                            <span className="w-12 text-right font-mono text-slate-600 dark:text-slate-400 text-xs font-bold shrink-0">
+                                                {pct.toFixed(1)}%
+                                            </span>
                                         </div>
-                                        <span className="w-14 text-right font-mono text-slate-600 dark:text-slate-400 text-xs font-bold shrink-0">
-                                            {pct.toFixed(1)}%
-                                        </span>
-                                        <SeverityBadge severity={severity} />
+                                        <div className="shrink-0 sm:ml-auto">
+                                            <SeverityBadge severity={severity} />
+                                        </div>
                                     </div>
                                 );
                             })}
@@ -347,7 +352,6 @@ const AnalysisResults = ({ result, imagePreview }: AnalysisResultsProps) => {
                                 key={condition}
                                 condition={condition}
                                 detail={detail}
-                                index={index}
                                 defaultOpen={index === 0}
                             />
                         ))}
@@ -372,21 +376,23 @@ const AnalysisResults = ({ result, imagePreview }: AnalysisResultsProps) => {
                             const isPrimary = condition === result.prediction;
                             return (
                                 <div key={condition}
-                                    className={`flex items-center gap-3 text-sm px-3 py-2 rounded-lg transition-colors
+                                    className={`flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 text-sm px-3 py-2.5 rounded-lg transition-colors
                                         ${isPrimary ? 'bg-primary/5 border border-primary/20 font-semibold' : idx % 2 === 0 ? 'bg-slate-50 dark:bg-slate-900/30' : ''}`}>
-                                    <span className={`w-44 truncate shrink-0 ${isPrimary ? 'text-primary font-bold' : 'text-slate-600 dark:text-slate-400'}`}>
+                                    <span className={`w-full sm:w-44 truncate shrink-0 ${isPrimary ? 'text-primary font-bold' : 'text-slate-600 dark:text-slate-400'}`}>
                                         {condition}
                                         {isPrimary && <span className="ml-1.5 text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded-full">PRIMARY</span>}
                                     </span>
-                                    <div className="flex-1 h-2.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                                    <div className="flex items-center gap-3 w-full flex-1">
+                                        <div className="flex-1 h-2.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
                                         <div
                                             className={`h-full rounded-full transition-all duration-700 ${isPrimary ? 'bg-primary' : 'bg-slate-400/50 dark:bg-slate-600'}`}
                                             style={{ width: `${Math.max(pct, 0.5)}%` }}
                                         />
+                                        </div>
+                                        <span className={`w-14 text-right font-mono text-xs shrink-0 ${isPrimary ? 'text-primary font-bold' : 'text-slate-400'}`}>
+                                            {pct.toFixed(1)}%
+                                        </span>
                                     </div>
-                                    <span className={`w-14 text-right font-mono text-xs shrink-0 ${isPrimary ? 'text-primary font-bold' : 'text-slate-400'}`}>
-                                        {pct.toFixed(1)}%
-                                    </span>
                                 </div>
                             );
                         })}
@@ -420,6 +426,8 @@ const AnalysisResults = ({ result, imagePreview }: AnalysisResultsProps) => {
                     </div>
                 </div>
             )}
+
+            <FeedbackForm />
 
         </div>
     );

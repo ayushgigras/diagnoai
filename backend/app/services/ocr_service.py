@@ -48,27 +48,38 @@ async def extract_lab_values_from_file(file: bytes, file_name: str):
         }
         
         prompt = """
-        You are a highly accurate medical data extraction AI. Look at the attached laboratory report.
-        Extract EVERY test parameter listed in the report into a structured JSON array of objects.
+        You are a world-class medical document parser. Analyze the provided laboratory report image or PDF.
+        Your goal is to extract EVERY clinical test parameter into a structured JSON array.
         
-        You must return ONLY a raw JSON array (no markdown block, no introductory text, no comments).
-        Format your response strictly like this:
+        Rules for extraction:
+        1. **Comprehensiveness**: Extract ALL tests, including sub-tests, calculated values, and indices.
+        2. **Qualitative & Quantitative**: If the result is a number, provide it. If it's qualitative (e.g., "Positive", "Negative", "Reactive", "Trace", "1+"), extract it as a string. Do NOT skip qualitative results.
+        3. **Data Integrity**: 
+           - `parameter_name`: The full, clean name of the test as printed.
+           - `result_value`: The patient's actual result. (String or Number).
+           - `unit`: The unit of measurement (e.g., "mg/dL", "g/L", "%").
+           - `reference_range`: The biological reference interval or normal range.
+           - `flag`: If there's an 'H', 'L', '*', or 'Abnormal' flag printed next to the result, extract it.
+        4. **Cleanliness**: Remove any artifacts like bullet points, leading numbers, or interpretation symbols from names.
+        5. **Strict JSON**: Return ONLY a valid JSON array of objects. No markdown, no pre-amble.
+        
+        Example Output Format:
         [
           {
             "parameter_name": "Hemoglobin",
-            "result_value": 15.0,
+            "result_value": 14.2,
             "unit": "g/dL",
-            "reference_range": "13.0 - 17.0"
+            "reference_range": "13.0 - 17.0",
+            "flag": ""
           },
-          ...
+          {
+            "parameter_name": "Urine Glucose",
+            "result_value": "Negative",
+            "unit": "",
+            "reference_range": "Negative",
+            "flag": ""
+          }
         ]
-        
-        Rules:
-        1. Extract ALL parameters you see, not just common ones.
-        2. `result_value` MUST be a number (float or int). If the result is text (e.g., "Negative", "Present"), skip that parameter or convert it to a logic if possible, but preferably just extract the numeric ones.
-        3. `parameter_name` should be exactly as printed, but cleaned up (no strange symbols).
-        4. Do NOT hallucinate data. If a unit or reference range is missing for a row, put an empty string `""`.
-        5. CRITICAL: Make absolutely sure to place the patient's observed test result in `result_value` and the biological expected range in `reference_range`. Do not swap them.
         """
         
         response = model.generate_content([prompt, document_part])

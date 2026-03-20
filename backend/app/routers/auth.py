@@ -123,3 +123,15 @@ def upload_profile_image(
         return {"profile_image_url": image_url, "user": UserResponse.model_validate(current_user)}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+@router.delete("/me", response_model=dict)
+def delete_user_me(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Delete the current user's own account and associated data."""
+    if current_user.role == "admin":
+        raise HTTPException(status_code=400, detail="Admins cannot delete their own account here.")
+    db.delete(current_user)
+    db.commit()
+    return {"message": "User account and associated data deleted successfully."}

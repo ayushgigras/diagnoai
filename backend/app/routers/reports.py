@@ -30,6 +30,10 @@ def get_my_reports(
             report.doctor_name = report.doctor.full_name
         if report.patient:
             report.patient_name = f"{report.patient.first_name} {report.patient.last_name}".strip()
+            # If the report is associated with 'Unknown Patient' (fallback) but the current user is a patient,
+            # use the current user's name for their own display.
+            if report.patient_name == "Unknown Patient" and current_user.role == "patient":
+                report.patient_name = current_user.full_name
             report.patient_first_name = report.patient.first_name
             report.patient_last_name = report.patient.last_name
             report.patient_date_of_birth = report.patient.date_of_birth
@@ -50,7 +54,7 @@ def delete_report(
     if not report:
         raise HTTPException(status_code=404, detail="Report not found")
         
-    if report.doctor_id != current_user.id:
+    if current_user.role != "admin" and report.doctor_id != current_user.id:
         raise HTTPException(status_code=403, detail="Not authorized to delete this report")
         
     db.delete(report)

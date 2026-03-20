@@ -4,6 +4,7 @@ import { Users, FileText, Trash2, Shield, Search, Edit2, X, Check, Eye, CheckSqu
 import api from '../services/api';
 import AnalysisResults from '../components/xray/AnalysisResults';
 import LabResults from '../components/lab/LabResults';
+import useToastStore from '../store/useToastStore';
 
 const AdminDashboard = () => {
     const [activeTab, setActiveTab] = useState<'users' | 'reports'>('users');
@@ -15,6 +16,7 @@ const AdminDashboard = () => {
     const [viewingReport, setViewingReport] = useState<any | null>(null);
     const [selectedUserIds, setSelectedUserIds] = useState<Set<number>>(new Set());
     const [selectedReportIds, setSelectedReportIds] = useState<Set<number>>(new Set());
+    const { addToast } = useToastStore();
 
     useEffect(() => {
         fetchData();
@@ -28,7 +30,7 @@ const AdminDashboard = () => {
             if (activeTab === 'users') setUsers(res.data);
             else setReports(res.data);
         } catch (err) {
-            alert(`Failed to fetch ${activeTab}`);
+            addToast(`Failed to fetch ${activeTab}`, 'error');
             console.error(err);
         } finally {
             setLoading(false);
@@ -39,11 +41,11 @@ const AdminDashboard = () => {
         e.preventDefault();
         try {
             const res = await api.patch(`/admin/users/${editingUser.id}`, editingUser);
-            alert("User updated successfully");
+            addToast("User updated successfully", 'success');
             setUsers(users.map(u => u.id === editingUser.id ? res.data : u));
             setEditingUser(null);
         } catch (err) {
-            alert("Failed to update user details");
+            addToast("Failed to update user details", 'error');
         }
     };
 
@@ -51,10 +53,10 @@ const AdminDashboard = () => {
         if (!window.confirm("Are you sure you want to delete this user? All their data will be removed.")) return;
         try {
             await api.delete(`/admin/users/${userId}`);
-            alert("User deleted");
+            addToast("User deleted", 'success');
             setUsers(users.filter(u => u.id !== userId));
         } catch (err) {
-            alert("Failed to delete user");
+            addToast("Failed to delete user", 'error');
         }
     };
 
@@ -62,20 +64,31 @@ const AdminDashboard = () => {
         if (!window.confirm("Are you sure you want to delete this report?")) return;
         try {
             await api.delete(`/admin/reports/${reportId}`);
-            alert("Report deleted");
+            addToast("Report deleted", 'success');
             setReports(reports.filter(r => r.id !== reportId));
         } catch (err) {
-            alert("Failed to delete report");
+            addToast("Failed to delete report", 'error');
+        }
+    };
+
+    const handleUpdateStatus = async (userId: number, currentStatus: boolean) => {
+        try {
+            const newStatus = !currentStatus;
+            await api.patch(`/admin/users/${userId}/status`, { is_active: newStatus });
+            addToast(`User ${newStatus ? 'activated' : 'deactivated'}`, 'success');
+            setUsers(users.map(u => u.id === userId ? { ...u, is_active: newStatus } : u));
+        } catch (err) {
+            addToast("Failed to update status", 'error');
         }
     };
 
     const handleUpdateRole = async (userId: number, newRole: string) => {
         try {
             await api.patch(`/admin/users/${userId}/role`, { role: newRole });
-            alert(`Role updated to ${newRole}`);
+            addToast(`Role updated to ${newRole}`, 'success');
             setUsers(users.map(u => u.id === userId ? { ...u, role: newRole } : u));
         } catch (err) {
-            alert("Failed to update role");
+            addToast("Failed to update role", 'error');
         }
     };
 
@@ -120,11 +133,11 @@ const AdminDashboard = () => {
         if (!window.confirm(`Are you sure you want to delete ${selectedUserIds.size} user(s)? All their data will be removed.`)) return;
         try {
             await Promise.all([...selectedUserIds].map(id => api.delete(`/admin/users/${id}`)));
-            alert(`${selectedUserIds.size} user(s) deleted successfully`);
+            addToast(`${selectedUserIds.size} user(s) deleted successfully`, 'success');
             setUsers(users.filter(u => !selectedUserIds.has(u.id)));
             setSelectedUserIds(new Set());
         } catch (err) {
-            alert("Failed to delete some users");
+            addToast("Failed to delete some users", 'error');
         }
     };
 
@@ -133,11 +146,11 @@ const AdminDashboard = () => {
         if (!window.confirm(`Are you sure you want to delete ${selectedReportIds.size} report(s)?`)) return;
         try {
             await Promise.all([...selectedReportIds].map(id => api.delete(`/admin/reports/${id}`)));
-            alert(`${selectedReportIds.size} report(s) deleted successfully`);
+            addToast(`${selectedReportIds.size} report(s) deleted successfully`, 'success');
             setReports(reports.filter(r => !selectedReportIds.has(r.id)));
             setSelectedReportIds(new Set());
         } catch (err) {
-            alert("Failed to delete some reports");
+            addToast("Failed to delete some reports", 'error');
         }
     };
 
@@ -311,9 +324,12 @@ const AdminDashboard = () => {
                                                 </select>
                                             </td>
                                             <td className="px-6 py-4">
-                                                <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase ${user.is_active ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                                <button
+                                                    onClick={() => handleUpdateStatus(user.id, user.is_active)}
+                                                    className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase transition-all hover:ring-2 hover:ring-offset-2 hover:ring-primary/20 ${user.is_active ? 'bg-green-100 text-green-700 hover:bg-green-200' : 'bg-red-100 text-red-700 hover:bg-red-200'}`}
+                                                >
                                                     {user.is_active ? 'Active' : 'Inactive'}
-                                                </span>
+                                                </button>
                                             </td>
                                             <td className="px-6 py-4 text-right space-x-2">
                                                 <button 

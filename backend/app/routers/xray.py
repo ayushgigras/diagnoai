@@ -62,6 +62,7 @@ async def analyze_xray(
             db,
             patient_id=patient_id,
             patient_details=patient_details if has_patient_names else None,
+            current_user=current_user
         )
         new_report = Report(
             patient_id=resolved_patient_id,

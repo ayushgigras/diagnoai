@@ -14,6 +14,7 @@ import AdminDashboard from './pages/AdminDashboard';
 import ProtectedRoute from './components/common/ProtectedRoute';
 import NotificationsHelper from './components/common/NotificationsHelper';
 import ErrorBoundary from './components/common/ErrorBoundary';
+import ToastContainer from './components/common/ToastContainer';
 import api from './services/api';
 
 function App() {
@@ -59,6 +60,7 @@ function App() {
             </Routes>
           </main>
           <NotificationsHelper />
+          <ToastContainer />
           <Footer />
         </div>
       </Router>

@@ -2,9 +2,10 @@ import type { LabResult, LabParameter } from '../../types';
 import { Card, CardHeader, CardTitle, CardContent } from '../common/Card';
 import {
     CheckCircle2, AlertCircle, HelpCircle, Brain, Shield,
-    AlertTriangle, TrendingUp, Activity, Beaker, ArrowDown, ArrowUp, Minus
+    AlertTriangle, Activity, Beaker, ArrowDown, ArrowUp, Minus
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import FeedbackForm from '../common/FeedbackForm';
 
 interface LabResultsProps {
     result: LabResult;
@@ -51,28 +52,36 @@ const ParameterCard = ({ param }: { param: LabParameter }) => {
             'border-slate-200 dark:border-slate-800'
         )}>
             {/* Header Row */}
-            <div className="flex justify-between items-start mb-4">
+            <div className="flex flex-col sm:flex-row justify-between items-start gap-4 mb-4">
                 <div className="flex items-center gap-3">
                     <div className={`w-3 h-3 rounded-full ${cfg.dot} shrink-0`} />
                     <div>
-                        <h4 className="font-bold text-slate-900 dark:text-white text-base uppercase tracking-wide">
+                        <h4 className="font-bold text-slate-900 dark:text-white text-sm sm:text-base uppercase tracking-wide">
                             {param.name}
                         </h4>
                         <div className="flex items-center gap-1.5 mt-0.5">
                             {getDirectionIcon(param.status, param.percentage)}
-                            <span className="text-xs text-slate-400">
+                            <span className="text-[10px] sm:text-xs text-slate-400">
                                 Ref: {param.reference_range}
                             </span>
                         </div>
                     </div>
                 </div>
-                <div className="text-right">
+                <div className="flex flex-row sm:flex-col items-center sm:items-end justify-between w-full sm:w-auto gap-2">
                     <div className="flex items-baseline gap-1.5">
-                        <span className={`text-2xl font-black ${param.status === 'normal' ? 'text-slate-900 dark:text-white' : cfg.color}`}>
+                        <span className={`text-xl sm:text-2xl font-black ${param.status === 'normal' ? 'text-slate-900 dark:text-white' : cfg.color}`}>
                             {param.value}
                         </span>
+                        {param.flag && (
+                            <span className={cn(
+                                "flex items-center justify-center min-w-[24px] px-1.5 h-6 rounded bg-red-100 dark:bg-red-500/20 text-red-600 dark:text-red-400 text-[10px] font-black border border-red-200 dark:border-red-800/50 animate-pulse-subtle",
+                                param.flag === 'H' ? "bg-red-100 text-red-600" : "bg-blue-100 text-blue-600 dark:bg-blue-500/20 dark:text-blue-400 border-blue-200 dark:border-blue-800/50"
+                            )} title={param.flag === 'H' ? 'High' : param.flag === 'L' ? 'Low' : 'Flag'}>
+                                {param.flag}
+                            </span>
+                        )}
                         {param.unit && (
-                            <span className="text-xs text-slate-400 font-medium">{param.unit}</span>
+                            <span className="text-[10px] sm:text-xs text-slate-400 font-medium">{param.unit}</span>
                         )}
                     </div>
                     <StatusBadge status={param.status} />
@@ -245,6 +254,7 @@ const LabResults = ({ result }: LabResultsProps) => {
                     </div>
                 </CardContent>
             </Card>
+            <FeedbackForm />
         </div>
     );
 };

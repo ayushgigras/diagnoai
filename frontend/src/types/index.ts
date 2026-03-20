@@ -65,6 +65,7 @@ export interface LabParameter {
     reference_range: string;
     status: 'normal' | 'abnormal' | 'critical' | 'unknown';
     percentage: number;
+    flag?: string;
 }
 
 export interface LabResult {
