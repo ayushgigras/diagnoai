@@ -8,6 +8,7 @@ DiagnoAI is a full-stack AI-powered diagnostic system designed to assist healthc
 - **🧪 Lab Report Analysis**: Intelligent parsing of PDF/Image lab reports using OCR (Google Gemini Vision), with automatic interpretation of values against reference ranges and clinical flags (H/L/*).
 - **📝 Intelligent Insights**: Confidence scores, probability distributions, and plain-English clinical recommendations.
 - **🔒 Secure by Design**: JWT authentication, CSRF protection, bcrypt password hashing, rate limiting, security headers, input validation, and role-based access control (RBAC).
+- **🔑 Auth & Verification**: Email/password login, Google sign-in securely handled natively, robust email verification on signup, and a password reset flow.
 - **📊 Report History**: Persistent report storage with per-user history and patient identification for registered users.
 - **🛠️ Admin Control**: User activation/deactivation, role management, and bulk report deletion.
 - **⚡ Background Processing**: Long-running Lab OCR tasks run asynchronously via Celery + Redis.
@@ -113,6 +114,14 @@ DATABASE_URL=postgresql://postgres:<YOUR_DB_PASSWORD>@localhost:5432/diagnoai
 CELERY_BROKER_URL=redis://localhost:6379/0
 CELERY_RESULT_BACKEND=redis://localhost:6379/1
 ADMIN_REGISTRATION_KEY=<YOUR_ADMIN_SECRET_KEY>
+GOOGLE_CLIENT_ID=<YOUR_GOOGLE_OAUTH_CLIENT_ID>
+FRONTEND_URL=http://localhost:5173
+SMTP_HOST=<YOUR_SMTP_HOST>
+SMTP_PORT=587
+SMTP_USERNAME=<YOUR_SMTP_USERNAME>
+SMTP_PASSWORD=<YOUR_SMTP_PASSWORD>
+SMTP_SENDER_EMAIL=<YOUR_SENDER_EMAIL>
+SMTP_USE_TLS=true
 APP_ENV=development
 ```
 
@@ -144,6 +153,13 @@ npm install
 npm run dev
 ```
 
+Optional `frontend/.env` for Google sign-in:
+
+```env
+VITE_GOOGLE_CLIENT_ID=<YOUR_GOOGLE_OAUTH_CLIENT_ID>
+VITE_API_URL=http://localhost:8000/api
+```
+
 Client runs at `http://localhost:5173`.
 
 ### 4) Streamlit Frontend (Alternative)
@@ -160,6 +176,11 @@ Opens at `http://localhost:8501`. Ensure the backend API server is running on po
 |--------|---------------------------|------|--------------------------------------|
 | POST   | `/api/auth/register`      | No   | Register a new user                  |
 | POST   | `/api/auth/login`         | No   | Login and receive JWT token          |
+| POST   | `/api/auth/google`        | No   | Sign in with Google ID token         |
+| POST   | `/api/auth/verify-email`  | No   | Verify user email via hashed token   |
+| POST   | `/api/auth/resend-verification`| No| Request a new verification email     |
+| POST   | `/api/auth/forgot-password` | No | Request password reset link          |
+| POST   | `/api/auth/reset-password`  | No | Reset password using reset token     |
 | GET    | `/api/auth/me`            | Yes  | Get current user profile             |
 | POST   | `/api/xray/analyze`       | Yes  | Upload X-ray for synchronous analysis|
 | POST   | `/api/lab/analyze-manual` | Yes  | Analyze manually entered lab values  |
@@ -242,6 +263,14 @@ Tests cover:
 | CELERY_BROKER_URL | Redis URL for Celery | Yes | redis://localhost:6379/0 |
 | CELERY_RESULT_BACKEND | Redis URL for results | Yes | redis://localhost:6379/1 |
 | ADMIN_REGISTRATION_KEY | Secret to register admin accounts | Yes | random string |
+| GOOGLE_CLIENT_ID | Google OAuth client ID (backend verification) | No | 123...apps.googleusercontent.com |
+| FRONTEND_URL | Frontend base URL used to build reset links | No | http://localhost:5173 |
+| SMTP_HOST | SMTP host for password reset emails | No | smtp.resend.com |
+| SMTP_PORT | SMTP port | No | 587 |
+| SMTP_USERNAME | SMTP username | No | resend |
+| SMTP_PASSWORD | SMTP app password / SMTP password | No | re_YOUR_API_KEY |
+| SMTP_SENDER_EMAIL | From email for reset emails | No | onboarding@resend.dev |
+| SMTP_USE_TLS | Enable STARTTLS for SMTP | No | true |
 | APP_ENV | Environment (development/production) | No | development |
 | RATELIMIT_ENABLED | Enable/disable rate limiting | No | true |
 | ALLOWED_HOSTS | Comma-separated allowed hostnames | No | localhost,127.0.0.1 |
@@ -258,6 +287,8 @@ Tests cover:
 
 - Auth is JWT-based. `JWT_SECRET_KEY` is required in production (a dev fallback is used automatically when `APP_ENV=development`).
 - `ADMIN_REGISTRATION_KEY` is always required at startup. It is used to gate admin-role registrations via `POST /api/auth/register`.
+- Google sign-in requires `GOOGLE_CLIENT_ID` on the backend and `VITE_GOOGLE_CLIENT_ID` on the frontend.
+- Password reset emails use SMTP settings when configured; in development, the forgot-password response also includes a direct `reset_url` for local testing.
 - Background analysis (`/api/lab/analyze-from-file`) uses Celery + Redis. X-ray analysis operates synchronously.
 - `patient_id` can be passed in analyze requests; if omitted, backend resolves a fallback patient.
 - New self-registrations default to the `patient` role. To register as `admin`, supply `admin_secret` matching `ADMIN_REGISTRATION_KEY` in the request body.

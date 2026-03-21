@@ -15,6 +15,16 @@ class Settings(BaseSettings):
     # Environment API Keys
     GEMINI_API_KEY: str | None = None
     ADMIN_REGISTRATION_KEY: str
+    GOOGLE_CLIENT_ID: str | None = None
+    FRONTEND_URL: str = "http://localhost:5173"
+
+    # Optional SMTP settings for password reset emails
+    SMTP_HOST: str | None = None
+    SMTP_PORT: int = 587
+    SMTP_USERNAME: str | None = None
+    SMTP_PASSWORD: str | None = None
+    SMTP_SENDER_EMAIL: str | None = None
+    SMTP_USE_TLS: bool = True
 
     # Redis / Celery
     CELERY_BROKER_URL: str = "redis://127.0.0.1:6379/0"

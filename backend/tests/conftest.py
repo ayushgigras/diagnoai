@@ -94,6 +94,7 @@ def auth_headers(client, test_user_data):
     from app.models.user import User
     user = db.query(User).filter(User.email == test_user_data["email"]).first()
     user.role = "doctor"
+    user.is_verified = True
     db.commit()
     db.close()
     # Login
@@ -114,6 +115,12 @@ def patient_auth_headers(client):
         "password": "SecurePass1!",
     }
     client.post("/api/auth/register", json=patient_data)
+    db = TestingSessionLocal()
+    from app.models.user import User
+    user = db.query(User).filter(User.email == patient_data["email"]).first()
+    user.is_verified = True
+    db.commit()
+    db.close()
     login_resp = client.post(
         "/api/auth/login",
         data={"username": patient_data["email"], "password": patient_data["password"]},
@@ -135,6 +142,7 @@ def admin_auth_headers(client):
     from app.models.user import User
     user = db.query(User).filter(User.email == admin_data["email"]).first()
     user.role = "admin"
+    user.is_verified = True
     db.commit()
     db.close()
     login_resp = client.post(

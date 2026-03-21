@@ -1,8 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
-from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from typing import List
-import os
 
 from ..database import get_db
 from ..models.report import Report
@@ -30,10 +28,6 @@ def get_my_reports(
             report.doctor_name = report.doctor.full_name
         if report.patient:
             report.patient_name = f"{report.patient.first_name} {report.patient.last_name}".strip()
-            # If the report is associated with 'Unknown Patient' (fallback) but the current user is a patient,
-            # use the current user's name for their own display.
-            if report.patient_name == "Unknown Patient" and current_user.role == "patient":
-                report.patient_name = current_user.full_name
             report.patient_first_name = report.patient.first_name
             report.patient_last_name = report.patient.last_name
             report.patient_date_of_birth = report.patient.date_of_birth
@@ -54,20 +48,9 @@ def delete_report(
     if not report:
         raise HTTPException(status_code=404, detail="Report not found")
         
-    if current_user.role != "admin" and report.doctor_id != current_user.id:
+    if report.doctor_id != current_user.id:
         raise HTTPException(status_code=403, detail="Not authorized to delete this report")
         
     db.delete(report)
     db.commit()
     return {"message": "Report deleted successfully"}
-
-@router.get("/uploads/{filename}")
-async def serve_upload(
-    filename: str, 
-    current_user: User = Depends(get_current_user)
-):
-    UPLOAD_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "..", "uploads")
-    file_path = os.path.join(UPLOAD_DIR, filename)
-    if not os.path.exists(file_path):
-        raise HTTPException(status_code=404)
-    return FileResponse(file_path)

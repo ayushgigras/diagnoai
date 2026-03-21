@@ -16,9 +16,6 @@ from pydantic import BaseModel
 class RoleUpdate(BaseModel):
     role: str
 
-class StatusUpdate(BaseModel):
-    is_active: bool
-
 # --- User Management ---
 
 @router.get("/users", response_model=List[UserResponse])
@@ -67,25 +64,6 @@ def update_user_role(
     db.commit()
     return {"message": f"User role updated to {role}"}
 
-@router.patch("/users/{user_id}/status")
-def update_user_status(
-    user_id: int,
-    status_update: StatusUpdate,
-    db: Session = Depends(get_db),
-    admin: User = Depends(get_current_admin)
-):
-    """Update a user's active status."""
-    user = db.query(User).filter(User.id == user_id).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-        
-    if user.id == admin.id and not status_update.is_active:
-        raise HTTPException(status_code=400, detail="Cannot deactivate your own admin account")
-        
-    user.is_active = status_update.is_active
-    db.commit()
-    return {"message": f"User status updated to {'active' if user.is_active else 'inactive'}", "is_active": user.is_active}
-
 @router.patch("/users/{user_id}", response_model=UserResponse)
 def update_user_details(
     user_id: int,
@@ -123,9 +101,6 @@ def get_all_reports(
             report.doctor_name = report.doctor.full_name
         if report.patient:
             report.patient_name = f"{report.patient.first_name} {report.patient.last_name}"
-            # Use doctor's name if they are the patient and report has 'Unknown Patient' fallback
-            if report.patient_name == "Unknown Patient" and report.doctor and report.doctor.role == "patient":
-                report.patient_name = report.doctor.full_name
             report.patient_first_name = report.patient.first_name
             report.patient_last_name = report.patient.last_name
             report.patient_date_of_birth = report.patient.date_of_birth

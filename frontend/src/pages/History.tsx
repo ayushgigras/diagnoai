@@ -6,7 +6,6 @@ import AnalysisResults from '../components/xray/AnalysisResults';
 import LabResults from '../components/lab/LabResults';
 import type { ReportPatientDetails } from '../types';
 import { downloadReportPdf } from '../utils/reportPdf';
-import useToastStore from '../store/useToastStore';
 
 interface Report extends ReportPatientDetails {
     id: number;
@@ -34,7 +33,6 @@ const History = () => {
     const [filterStatus, setFilterStatus] = useState('all');
     const [expandedId, setExpandedId] = useState<number | null>(null);
     const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
-    const { addToast } = useToastStore();
 
     useEffect(() => {
         const fetchReports = async () => {
@@ -56,10 +54,9 @@ const History = () => {
         try {
             await api.delete(`/reports/${id}`);
             setReports(prev => prev.filter(r => r.id !== id));
-            addToast('Report deleted successfully', 'success');
         } catch (err: any) {
             console.error(err);
-            addToast('Failed to delete report.', 'error');
+            alert('Failed to delete report.');
         }
     };
 
@@ -86,12 +83,12 @@ const History = () => {
         if (!window.confirm(`Are you sure you want to delete ${selectedIds.size} report(s)?`)) return;
         try {
             await Promise.all([...selectedIds].map(id => api.delete(`/reports/${id}`)));
-            addToast(`${selectedIds.size} report(s) deleted successfully`, 'success');
+            alert(`${selectedIds.size} report(s) deleted successfully`);
             setReports(prev => prev.filter(r => !selectedIds.has(r.id)));
             setSelectedIds(new Set());
         } catch (err: any) {
             console.error(err);
-            addToast('Failed to delete some reports.', 'error');
+            alert('Failed to delete some reports.');
         }
     };
 
@@ -366,7 +363,7 @@ const History = () => {
                                         animate={{ opacity: 1, height: 'auto' }}
                                         className="mt-6 pt-6 border-t border-slate-100 dark:border-slate-800 overflow-hidden"
                                     >
-                                        <div className="mb-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                        <div className="mb-5 grid md:grid-cols-2 gap-4">
                                             <div className="rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/30 p-3">
                                                 <div className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">Patient Details</div>
                                                 <div className="text-sm font-semibold text-slate-900 dark:text-white mt-1">{getPatientName(report)}</div>
