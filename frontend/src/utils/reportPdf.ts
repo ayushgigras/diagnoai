@@ -1,5 +1,6 @@
 import jsPDF from 'jspdf';
 import type { LabResult, ReportPatientDetails, XAIDetail, XRayResult } from '../types';
+import { calculateParameterStatus, stripEmojis } from './labUtils';
 
 interface PdfReportInput {
     fileName: string;
@@ -14,18 +15,17 @@ interface PdfReportInput {
 type RGB = [number, number, number];
 
 const C = {
-    primary:       [37, 99, 235]   as RGB,
-    primaryLight:  [219, 234, 254] as RGB,
-    critical:      [220, 38, 38]   as RGB,
-    criticalLight: [254, 226, 226] as RGB,
-    high:          [234, 88, 12]   as RGB,
-    highLight:     [255, 237, 213] as RGB,
-    moderate:      [161, 98, 7]    as RGB,
-    moderateLight: [254, 249, 195] as RGB,
-    normal:        [22, 101, 52]   as RGB,
-    normalLight:   [220, 252, 231] as RGB,
-    violet:        [109, 40, 217]  as RGB,
-    violetLight:   [237, 233, 254] as RGB,
+    primary:       [15, 118, 110]  as RGB, // Teal fallback
+    critical:      [153, 27, 27]   as RGB, // Dark Red
+    high:          [239, 68, 68]   as RGB, // Red
+    moderate:      [249, 115, 22]  as RGB, // Orange
+    borderline:    [234, 179, 8]   as RGB, // Yellow
+    low:           [59, 130, 246]  as RGB, // Blue
+    normal:        [16, 185, 129]  as RGB, // Green
+    teal:          [15, 118, 110]  as RGB, 
+    tealLight:     [204, 251, 241] as RGB,
+    yellow:        [245, 158, 11]  as RGB, // Amber for border
+    yellowLight:   [255, 251, 235] as RGB, 
     dark:          [15, 23, 42]    as RGB,
     slate700:      [51, 65, 85]    as RGB,
     slate600:      [71, 85, 105]   as RGB,
@@ -33,33 +33,35 @@ const C = {
     slate200:      [226, 232, 240] as RGB,
     slate100:      [241, 245, 249] as RGB,
     white:         [255, 255, 255] as RGB,
+    grayBox:       [248, 249, 250] as RGB, 
 };
 
 const sevColor = (s: string): RGB => {
-    if (s === 'critical') return C.critical;
-    if (s === 'high')     return C.high;
-    if (s === 'moderate') return C.moderate;
-    if (s === 'normal')   return C.normal;
-    return C.primary;
+    const lower = s.toLowerCase();
+    if (lower === 'critical') return C.critical;
+    if (lower === 'high' || lower === 'abnormal') return C.high;
+    if (lower === 'moderate') return C.moderate;
+    if (lower === 'borderline') return C.borderline;
+    if (lower === 'low')      return C.low;
+    if (lower === 'normal')   return C.normal;
+    return C.slate400; // unknown
 };
 
-const sevLightColor = (s: string): RGB => {
-    if (s === 'critical') return C.criticalLight;
-    if (s === 'high')     return C.highLight;
-    if (s === 'moderate') return C.moderateLight;
-    if (s === 'normal')   return C.normalLight;
-    return C.primaryLight;
+const getTextColorForBg = (s: string): RGB => {
+    const lower = s.toLowerCase();
+    if (lower === 'borderline') return C.dark; 
+    return C.white; 
 };
 
 const sanitizeFileName = (value: string) => value.replace(/[^a-zA-Z0-9-_]/g, '_');
 
 const patientName = (patient?: ReportPatientDetails | null) => {
-    if (!patient) return 'N/A';
-    if (patient.patient_name && patient.patient_name.trim()) return patient.patient_name;
-    const first = patient.patient_first_name || '';
-    const last = patient.patient_last_name || '';
-    const full = `${first} ${last}`.trim();
-    return full || 'N/A';
+    if (!patient) return 'General Analysis';
+    let full = '';
+    if (patient.patient_name && patient.patient_name.trim()) full = patient.patient_name.trim();
+    else full = `${patient.patient_first_name || ''} ${patient.patient_last_name || ''}`.trim();
+    if (!full || full.toLowerCase() === 'unknown patient') return 'General Analysis';
+    return full;
 };
 
 const isLabResult = (result: unknown): result is LabResult => {
@@ -72,295 +74,268 @@ const isXRayResult = (result: unknown): result is XRayResult => {
     return typeof (result as XRayResult).prediction === 'string';
 };
 
-export const downloadReportPdf = (input: PdfReportInput) => {
+const loadImageAsDataUrl = (src: string): Promise<string | null> =>
+    new Promise((resolve) => {
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.onload = () => {
+            try {
+                const canvas = document.createElement('canvas');
+                canvas.width = img.naturalWidth;
+                canvas.height = img.naturalHeight;
+                const ctx = canvas.getContext('2d')!;
+                ctx.drawImage(img, 0, 0);
+                resolve(canvas.toDataURL('image/png'));
+            } catch { resolve(null); }
+        };
+        img.onerror = () => resolve(null);
+        img.src = src;
+    });
+
+export const downloadReportPdf = async (input: PdfReportInput) => {
+    const logoDataUrl = await loadImageAsDataUrl('/logo.png');
     const doc = new jsPDF({ unit: 'pt', format: 'a4' });
     const PW = doc.internal.pageSize.getWidth();
     const PH = doc.internal.pageSize.getHeight();
     const MX = 40;
     const CW = PW - MX * 2;
-    const LH = 15;
-    let y = 0;
+    let y = 85; 
 
     /* ── helpers ─────────────────────────────────────────────────── */
     const newPageIfNeeded = (needed: number) => {
-        if (y + needed > PH - 44) { doc.addPage(); y = 44; }
+        if (y + needed > PH - 45) { doc.addPage(); y = 85; }
     };
     const tc  = (rgb: RGB) => doc.setTextColor(rgb[0], rgb[1], rgb[2]);
     const fc  = (rgb: RGB) => doc.setFillColor(rgb[0], rgb[1], rgb[2]);
     const dc  = (rgb: RGB) => doc.setDrawColor(rgb[0], rgb[1], rgb[2]);
-    const t   = (s: string, x: number, ty: number, opts?: { align?: string }) =>
-        doc.text(s, x, ty, opts as any);
+    const t   = (s: string, x: number, ty: number, opts?: { align?: string }) => doc.text(s, x, ty, opts as any);
 
-    const writeLine = (str: string, x: number, size: number, color: RGB, bold = false) => {
-        newPageIfNeeded(LH);
-        doc.setFont('helvetica', bold ? 'bold' : 'normal');
-        doc.setFontSize(size);
-        tc(color);
-        t(str, x, y);
-        y += LH;
+    const sectionHeader = (title: string) => {
+        newPageIfNeeded(50);
+        y += 14; 
+        fc(C.teal); doc.rect(MX, y, CW, 24, 'F');
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(14); tc(C.white);
+        t(title.toUpperCase(), MX + 12, y + 17);
+        y += 38;
     };
 
-    const writeWrapped = (str: string, x: number, maxW: number, size: number, color: RGB, bold = false) => {
-        doc.setFont('helvetica', bold ? 'bold' : 'normal');
-        doc.setFontSize(size);
-        tc(color);
-        (doc.splitTextToSize(str, maxW) as string[]).forEach((line) => {
-            newPageIfNeeded(LH);
-            t(line, x, y);
-            y += LH;
-        });
-    };
-
-    const sectionHeader = (title: string, color: RGB = C.primary) => {
-        newPageIfNeeded(32);
-        y += 6;
+    // Correctly mapped, properly colored badges
+    const sevBadge = (sev: string, bx: number, by: number) => {
+        const label = sev.toUpperCase();
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(9);
+        const tw = doc.getTextWidth(label) + 16;
+        const color = sevColor(sev);
+        const textColor = getTextColorForBg(sev);
+        
         fc(color); dc(color);
-        doc.roundedRect(MX, y, CW, 22, 3, 3, 'F');
-        doc.setFont('helvetica', 'bold'); doc.setFontSize(10); tc(C.white);
-        t(title, MX + 10, y + 15);
-        y += 30;
+        doc.roundedRect(bx, by - 12, tw, 18, 3, 3, 'FD');
+        tc(textColor);
+        t(label, bx + 8, by + 1);
+        return tw + 8;
     };
 
-    const badge = (label: string, bx: number, by: number, color: RGB, light: RGB) => {
-        doc.setFontSize(7);
-        const tw = doc.getTextWidth(label) + 8;
-        fc(light); dc(color);
-        doc.roundedRect(bx, by - 9, tw, 12, 2, 2, 'FD');
-        tc(color); doc.setFont('helvetica', 'bold');
-        t(label, bx + 4, by);
-        return tw + 4;
-    };
-
-    const sevBadge = (sev: string, bx: number, by: number) =>
-        badge(sev.charAt(0).toUpperCase() + sev.slice(1), bx, by, sevColor(sev), sevLightColor(sev));
-
-    const progressBar = (bx: number, by: number, bw: number, pct: number, color: RGB) => {
-        fc(C.slate200); doc.roundedRect(bx, by, bw, 6, 2, 2, 'F');
-        fc(color); doc.roundedRect(bx, by, Math.max(3, (pct / 100) * bw), 6, 2, 2, 'F');
-    };
-
-    /* ── page footer (drawn after all pages are created) ─────────── */
-    const drawFooters = () => {
+    const drawFootersAndHeaders = () => {
         const pages = (doc.internal as any).getNumberOfPages() as number;
         for (let i = 1; i <= pages; i++) {
             doc.setPage(i);
-            fc(C.slate100); doc.rect(0, PH - 26, PW, 26, 'F');
-            doc.setFont('helvetica', 'normal'); doc.setFontSize(7); tc(C.slate400);
-            t('DiagnoAI · AI-powered diagnostic tool for educational/research use only. Not a substitute for professional medical advice.', MX, PH - 10);
-            t(`Page ${i} of ${pages}`, PW - MX, PH - 10, { align: 'right' });
+            
+            /* HEADER ─────────────────────────────────────────────────── */
+            fc(C.teal); doc.rect(0, 0, PW, 64, 'F');
+
+            // White rounded box — gives contrast for any logo colour
+            fc(C.white); dc(C.white); doc.setLineWidth(0);
+            doc.roundedRect(10, 5, 50, 40, 6, 6, 'F');
+
+            // Logo image centred inside the white box
+            if (logoDataUrl) {
+                doc.addImage(logoDataUrl, 'PNG', 17, 7, 36, 36);
+            }
+
+            const textX = 70; // text starts after the white box
+            doc.setFont('helvetica', 'bold'); doc.setFontSize(22); tc(C.white);
+            t('DiagnoAI', textX, 34);
+            doc.setFont('helvetica', 'normal'); doc.setFontSize(10); tc(C.tealLight);
+            t('AI-Powered Medical Diagnostic Report', textX, 50);
+            
+            const typeLabel = input.reportType === 'xray' ? 'X-RAY ANALYSIS'
+                : input.reportType === 'lab' ? 'LAB REPORT ANALYSIS'
+                : 'DIAGNOSTIC REPORT';
+            doc.setFont('helvetica', 'bold'); doc.setFontSize(14); tc(C.white);
+            t(typeLabel, PW - MX, 34, { align: 'right' });
+            
+            const analyzedAt = input.analyzedAt ? new Date(input.analyzedAt).toLocaleString() : new Date().toLocaleString();
+            doc.setFont('helvetica', 'normal'); doc.setFontSize(10); tc(C.tealLight);
+            t(`Date: ${analyzedAt}`, PW - MX, 50, { align: 'right' });
+
+            /* FOOTER ─────────────────────────────────────────────────── */
+            dc(C.slate200); doc.setLineWidth(1.5); doc.line(MX, PH - 32, PW - MX, PH - 32);
+            doc.setFont('helvetica', 'bold'); doc.setFontSize(9); tc(C.slate400);
+            t('DiagnoAI', MX, PH - 16);
+            doc.setFont('helvetica', 'normal');
+            t('Disclaimer: For educational & research purposes only. Not a substitute for medical advice.', PW / 2, PH - 16, { align: 'center' });
+            t(`Page ${i} of ${pages}`, PW - MX, PH - 16, { align: 'right' });
         }
     };
 
-    /* ── header bar ─────────────────────────────────────────────── */
-    fc(C.dark); doc.rect(0, 0, PW, 52, 'F');
-    doc.setFont('helvetica', 'bold'); doc.setFontSize(20); tc(C.white);
-    t('DiagnoAI', MX, 26);
-    doc.setFont('helvetica', 'normal'); doc.setFontSize(8); tc(C.slate400);
-    t('AI-Powered Medical Diagnostic Report', MX, 42);
+    /* ── Patient Profile box ────────────────────────────────────── */
+    fc(C.grayBox); dc(C.slate200); doc.setLineWidth(1);
+    doc.roundedRect(MX, y, CW, 74, 4, 4, 'FD');
+    fc(C.teal); doc.roundedRect(MX, y, 4, 74, 4, 4, 'F'); // left accent
 
-    const typeLabel = input.reportType === 'xray' ? 'X-RAY ANALYSIS'
-        : input.reportType === 'lab' ? 'LAB REPORT ANALYSIS'
-        : String(input.reportType).toUpperCase();
-    doc.setFont('helvetica', 'bold'); doc.setFontSize(9); tc(C.slate400);
-    t(typeLabel, PW - MX, 26, { align: 'right' });
-    doc.setFont('helvetica', 'normal'); doc.setFontSize(8);
-    const analyzedAt = input.analyzedAt ? new Date(input.analyzedAt).toLocaleString() : new Date().toLocaleString();
-    t(analyzedAt, PW - MX, 42, { align: 'right' });
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(12); tc(C.teal);
+    t('PATIENT DETAILS', MX + 16, y + 18);
+    t('ANALYSIS DETAILS', CW/2 + MX + 10, y + 18);
+    
+    dc(C.slate200); doc.setLineWidth(1); doc.line(MX + 16, y + 26, PW - MX - 16, y + 26);
 
-    y = 62;
+    const splitFormat = (k: string, v: string, x: number, lineY: number) => {
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(11); tc(C.slate700); t(k, x, lineY);
+        doc.setFont('helvetica', 'normal'); tc(C.dark); t(v, x + doc.getTextWidth(k) + 6, lineY);
+    };
 
-    /* ── patient + analysis cards ────────────────────────────────── */
-    const halfW = (CW - 10) / 2;
-    newPageIfNeeded(80);
+    const pX = MX + 16;
+    const aX = CW/2 + MX + 10;
+    
+    splitFormat('Name:', patientName(input.patient), pX, y + 44);
+    splitFormat('Report Type:', input.reportType === 'xray' ? 'X-Ray' : 'Lab', aX, y + 44);
+    
+    splitFormat('DOB:', input.patient?.patient_date_of_birth || 'N/A', pX, y + 60);
+    splitFormat('Analyzed By:', input.analyzedBy || 'N/A', aX, y + 60);
 
-    // patient card
-    fc(C.slate100); dc(C.slate200);
-    doc.roundedRect(MX, y, halfW, 70, 4, 4, 'FD');
-    doc.setFont('helvetica', 'bold'); doc.setFontSize(7); tc(C.slate400);
-    t('PATIENT DETAILS', MX + 10, y + 13);
-    doc.setFont('helvetica', 'bold'); doc.setFontSize(11); tc(C.dark);
-    t(patientName(input.patient), MX + 10, y + 28);
-    doc.setFont('helvetica', 'normal'); doc.setFontSize(9); tc(C.slate600);
-    const dobStr   = input.patient?.patient_date_of_birth ? `DOB: ${input.patient.patient_date_of_birth}` : '';
-    const genderStr = input.patient?.patient_gender ? `Gender: ${input.patient.patient_gender}` : '';
-    t([dobStr, genderStr].filter(Boolean).join('   '), MX + 10, y + 43);
-    if (input.patient?.patient_contact_number)
-        t(`Contact: ${input.patient.patient_contact_number}`, MX + 10, y + 57);
-
-    // analysis card
-    const cx2 = MX + halfW + 10;
-    fc(C.slate100); dc(C.slate200);
-    doc.roundedRect(cx2, y, halfW, 70, 4, 4, 'FD');
-    doc.setFont('helvetica', 'bold'); doc.setFontSize(7); tc(C.slate400);
-    t('ANALYSIS DETAILS', cx2 + 10, y + 13);
-    doc.setFont('helvetica', 'bold'); doc.setFontSize(11); tc(C.dark);
-    t(input.reportType === 'xray' ? 'X-Ray Analysis' : 'Lab Report Analysis', cx2 + 10, y + 28);
-    doc.setFont('helvetica', 'normal'); doc.setFontSize(9); tc(C.slate600);
-    t(`By: ${input.analyzedBy || 'N/A'}`, cx2 + 10, y + 43);
-    t(`Status: ${input.status || 'completed'}`, cx2 + 10, y + 57);
-
-    y += 82;
+    y += 94; // Move below patient box with breathing room
 
     /* ══════════════════════════════════════════════════════════════
        X-RAY REPORT
     ══════════════════════════════════════════════════════════════ */
     if (isXRayResult(input.result)) {
         const result = input.result;
-        const primarySev = result.findings?.[0]?.severity ?? 'moderate';
-        const bColor = sevColor(primarySev);
-        const bLight = sevLightColor(primarySev);
+        
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(20); tc(C.dark);
+        const title = stripEmojis(result.prediction);
+        t(title, MX, y);
+        y += 22;
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(11); tc(C.slate600);
+        t(`Confidence: ${(result.confidence * 100).toFixed(1)}%`, MX, y);
+        if (result.region) t(`  ·  Region: ${result.region}`, MX + doc.getTextWidth(`Confidence: ${(result.confidence * 100).toFixed(1)}%`), y);
+        y += 24;
 
-        /* primary finding banner */
-        newPageIfNeeded(64);
-        fc(bLight); dc(bColor);
-        doc.roundedRect(MX, y, CW, 56, 4, 4, 'FD');
-        fc(bColor); doc.rect(MX, y, 4, 56, 'F');
-
-        doc.setFont('helvetica', 'bold'); doc.setFontSize(16); tc(bColor);
-        t(result.prediction, MX + 14, y + 20);
-        sevBadge(primarySev, MX + 18 + doc.getTextWidth(result.prediction), y + 20);
-
-        doc.setFont('helvetica', 'normal'); doc.setFontSize(9); tc(C.slate600);
-        t(`Confidence: ${(result.confidence * 100).toFixed(1)}%`, MX + 14, y + 36);
-        if (result.region) t(`  ·  Region: ${result.region}`, MX + 14 + doc.getTextWidth(`Confidence: ${(result.confidence * 100).toFixed(1)}%`), y + 36);
-        if (result.model_info)
-            t(`${result.model_info.name}  ·  ${result.model_info.xai_method}`, MX + 14, y + 50);
-        y += 64;
-
-        /* clinical summary */
         if (result.explanation) {
-            newPageIfNeeded(30);
-            fc(C.primaryLight); dc(C.slate200);
-            doc.roundedRect(MX, y, CW, 4, 2, 2, 'F');
-            y += 8;
-            writeWrapped(result.explanation, MX + 8, CW - 12, 9, C.slate700);
-            y += 4;
+            doc.setFontSize(11); tc(C.dark);
+            const lines = doc.splitTextToSize(stripEmojis(result.explanation), CW);
+            lines.forEach((line: string) => { t(line, MX, y); y += 14; });
+            y += 12;
         }
 
-        /* ── detected findings ──────────────────────────────────── */
-        if (result.findings?.length) {
-            sectionHeader('All Detected Findings');
-            result.findings.forEach((finding) => {
-                newPageIfNeeded(26);
-                const sc = sevColor(finding.severity);
-                const pct = finding.score * 100;
+        /* ── All Detected Findings Table ─────────────────────────── */
+        if (result.findings?.length && result.findings.length > 0) {
+            sectionHeader('ALL DETECTED FINDINGS');
+            
+            fc(C.tealLight); dc(C.slate200); doc.setLineWidth(1); doc.rect(MX, y, CW, 24, 'FD');
+            doc.setFont('helvetica', 'bold'); doc.setFontSize(11); tc(C.teal);
+            t('FINDING', MX + 12, y + 16);
+            t('CONFIDENCE', MX + CW * 0.5, y + 16);
+            t('SEVERITY', MX + CW * 0.75, y + 16);
+            y += 24;
 
-                doc.setFont('helvetica', 'bold'); doc.setFontSize(9); tc(sc);
-                const nameW = doc.getTextWidth(finding.condition);
-                t(finding.condition, MX + 4, y + 10);
-
-                const barX = MX + nameW + 16;
-                const barW = CW - nameW - 72;
-                progressBar(barX, y + 5, barW, pct, sc);
-
-                doc.setFont('helvetica', 'normal'); doc.setFontSize(8); tc(C.slate600);
-                t(`${pct.toFixed(1)}%`, barX + barW + 6, y + 10);
-                sevBadge(finding.severity, barX + barW + 38, y + 10);
-                y += 22;
+            result.findings.forEach((finding, i) => {
+                newPageIfNeeded(36);
+                fc(i % 2 === 0 ? C.white : C.grayBox); dc(C.slate200); doc.setLineWidth(0.5);
+                doc.rect(MX, y, CW, 32, 'FD');
+                
+                doc.setFont('helvetica', 'bold'); doc.setFontSize(12); tc(C.dark);
+                t(stripEmojis(finding.condition), MX + 12, y + 20);
+                
+                doc.setFont('helvetica', 'normal'); doc.setFontSize(11); tc(C.dark);
+                t(`${(finding.score * 100).toFixed(1)}%`, MX + CW * 0.5, y + 20);
+                
+                sevBadge(finding.severity, MX + CW * 0.75, y + 20);
+                y += 32; 
             });
-            y += 4;
+            y += 20; 
         }
 
-        /* ── explainability cards ───────────────────────────────── */
+        /* ── Explainability ─────────────────────────────────────── */
         const xaiEntries = Object.entries(result.xai_details || {}) as [string, XAIDetail][];
         if (xaiEntries.length > 0) {
-            sectionHeader('Explainability — Why This Result?', C.violet);
-            doc.setFont('helvetica', 'normal'); doc.setFontSize(8); tc(C.slate400);
-            writeWrapped(
-                'Each section explains what visual pattern the AI detected, where it focused (Grad-CAM), and the clinical interpretation.',
-                MX, CW, 8, C.slate400,
-            );
-            y += 4;
-
+            sectionHeader('EXPLAINABILITY');
+            
             xaiEntries.forEach(([condition, detail]) => {
-                const sc = sevColor(detail.severity);
-                const sl = sevLightColor(detail.severity);
+                const cleanCond = stripEmojis(condition);
+                const cleanRec = stripEmojis(detail.recommendation);
+                const recLines = (doc.splitTextToSize(cleanRec, CW - 32) as string[]).length;
+                const rfLines  = (doc.splitTextToSize(stripEmojis(detail.radiological_finding), CW - 32) as string[]).length;
+                const veLines  = (doc.splitTextToSize(stripEmojis(detail.visual_evidence), CW - 32) as string[]).length;
+                const ccLines  = (doc.splitTextToSize(stripEmojis(detail.clinical_context), CW - 32) as string[]).length;
+                
+                const cardH = 46 + (rfLines + veLines + ccLines) * 14 + recLines * 14 + 60;
 
-                // estimate card height
-                const recLines = (doc.splitTextToSize(detail.recommendation, CW - 30) as string[]).length;
-                const rfLines  = (doc.splitTextToSize(detail.radiological_finding, CW - 130) as string[]).length;
-                const veLines  = (doc.splitTextToSize(detail.visual_evidence, CW - 130) as string[]).length;
-                const ccLines  = (doc.splitTextToSize(detail.clinical_context, CW - 130) as string[]).length;
-                const cardH = 46 + (rfLines + veLines + ccLines) * 11 + recLines * 11 + 30;
-
-                newPageIfNeeded(cardH);
-                fc(sl); dc(sc);
+                newPageIfNeeded(cardH + 16);
+                
+                fc(C.grayBox); dc(C.slate200); doc.setLineWidth(1);
                 doc.roundedRect(MX, y, CW, cardH, 4, 4, 'FD');
-                fc(sc); doc.rect(MX, y, 4, cardH, 'F');
+                
+                doc.setFont('helvetica', 'bold'); doc.setFontSize(14); tc(C.teal);
+                t(cleanCond, MX + 16, y + 26);
+                
+                let ry = y + 48;
 
-                // condition header
-                doc.setFont('helvetica', 'bold'); doc.setFontSize(11); tc(sc);
-                t(condition, MX + 14, y + 16);
-                sevBadge(detail.severity, MX + 16 + doc.getTextWidth(condition), y + 16);
-
-                doc.setFont('helvetica', 'normal'); doc.setFontSize(8); tc(C.slate600);
-                t(`${detail.confidence_pct.toFixed(1)}% confidence  ·  ${detail.region}`, MX + 14, y + 30);
-
-                const labelX = MX + 14;
-                const valX   = MX + 110;
-                const valW   = CW - 120;
-                let ry = y + 44;
-
-                const detailRow = (label: string, val: string) => {
-                    doc.setFont('helvetica', 'bold'); doc.setFontSize(7); tc(C.slate400);
-                    t(label.toUpperCase(), labelX, ry);
-                    doc.setFont('helvetica', 'normal'); doc.setFontSize(8); tc(C.dark);
-                    (doc.splitTextToSize(val, valW) as string[]).forEach((line, i) => t(line, valX, ry + i * 11));
-                    ry += (doc.splitTextToSize(val, valW) as string[]).length * 11 + 5;
+                const detailBlock = (label: string, val: string) => {
+                    const cleanVal = stripEmojis(val);
+                    doc.setFont('helvetica', 'bold'); doc.setFontSize(9); tc(C.slate400); // small caps gray
+                    t(label.toUpperCase(), MX + 16, ry);
+                    ry += 14;
+                    doc.setFont('helvetica', 'normal'); doc.setFontSize(11); tc(C.dark); // body text dark
+                    (doc.splitTextToSize(cleanVal, CW - 32) as string[]).forEach((line: string) => {
+                        t(line, MX + 16, ry); ry += 14;
+                    });
+                    ry += 8;
                 };
 
-                detailRow('Radiological Finding', detail.radiological_finding);
-                detailRow('Visual Evidence (Grad-CAM)', detail.visual_evidence);
-                detailRow('Clinical Context', detail.clinical_context);
+                detailBlock('Radiological Finding', detail.radiological_finding);
+                detailBlock('Visual Evidence (Grad-CAM)', detail.visual_evidence);
+                detailBlock('Clinical Context', detail.clinical_context);
 
-                // recommendation chip
-                fc(sc); doc.roundedRect(labelX, ry, CW - 28, recLines * 12 + 8, 3, 3, 'F');
-                doc.setFont('helvetica', 'bold'); doc.setFontSize(8); tc(C.white);
-                (doc.splitTextToSize(detail.recommendation, CW - 36) as string[]).forEach((line, i) =>
-                    t(line, labelX + 6, ry + 11 + i * 12));
+                doc.setFont('helvetica', 'bold'); doc.setFontSize(9); tc(C.slate400);
+                t('RECOMMENDATION', MX + 16, ry);
+                ry += 14;
+                doc.setFont('helvetica', 'normal'); doc.setFontSize(11); tc(C.dark);
+                (doc.splitTextToSize(cleanRec, CW - 32) as string[]).forEach((line: string) => {
+                    t(line, MX + 16, ry); ry += 14;
+                });
 
-                y += cardH + 10;
+                y += cardH + 16;
             });
         }
 
-        /* ── probability distribution ───────────────────────────── */
-        const probs = Object.entries(result.probabilities || {})
-            .sort(([, a], [, b]) => b - a)
-            .slice(0, 18);
+        /* ── Probability Distribution ───────────────────────────── */
+        const probs = Object.entries(result.probabilities || {}).sort(([, a], [, b]) => b - a).slice(0, 18);
         if (probs.length > 0) {
-            sectionHeader('Probability Distribution (All Pathologies)');
-            const colW = (CW - 16) / 2;
-            let rowY = 0;
+            sectionHeader('PROBABILITY DISTRIBUTION');
+            const colW = (CW - 24) / 2;
+            let rowY = y;
             probs.forEach(([cond, prob], idx) => {
                 const col = idx % 2;
-                if (col === 0) { newPageIfNeeded(20); rowY = y; y += 18; }
-                const px = MX + col * (colW + 16);
-                const condW = 108;
-                const barW  = colW - condW - 36;
-                const label = cond.length > 17 ? cond.slice(0, 16) + '…' : cond;
-                doc.setFont('helvetica', 'normal'); doc.setFontSize(8); tc(C.slate600);
-                t(label, px, rowY + 11);
-                progressBar(px + condW, rowY + 5, barW, prob * 100, C.primary);
-                tc(C.slate400); t(`${(prob * 100).toFixed(1)}%`, px + condW + barW + 4, rowY + 11);
+                if (col === 0 && idx > 0) { rowY += 24; }
+                if (col === 0) { 
+                    if (rowY + 24 > PH - 60) { doc.addPage(); rowY = 85; y = 85; }
+                } 
+                
+                const px = MX + col * (colW + 24);
+                const condW = 120;
+                const barW  = colW - condW - 45;
+                const cleanCond = stripEmojis(cond);
+                const label = cleanCond.length > 20 ? cleanCond.slice(0, 19) + '…' : cleanCond;
+                
+                doc.setFont('helvetica', 'normal'); doc.setFontSize(11); tc(C.slate700);
+                t(label, px, rowY + 12);
+                
+                fc(C.slate200); doc.roundedRect(px + condW, rowY + 3, barW, 8, 2, 2, 'F');
+                fc(C.teal); doc.roundedRect(px + condW, rowY + 3, Math.max(4, prob * barW), 8, 2, 2, 'F');
+                
+                doc.setFont('helvetica', 'bold'); doc.setFontSize(10); tc(C.slate600);
+                t(`${(prob * 100).toFixed(1)}%`, px + condW + barW + 8, rowY + 11);
             });
-            y += 8;
-        }
-
-        /* ── model info ─────────────────────────────────────────── */
-        if (result.model_info) {
-            newPageIfNeeded(52);
-            fc(C.slate100); dc(C.slate200);
-            doc.roundedRect(MX, y, CW, 44, 4, 4, 'FD');
-            doc.setFont('helvetica', 'bold'); doc.setFontSize(8); tc(C.slate700);
-            t('Model & XAI Information', MX + 10, y + 14);
-            doc.setFont('helvetica', 'normal'); doc.setFontSize(8); tc(C.slate600);
-            t(
-                `Model: ${result.model_info.name}   |   Training: ${result.model_info.trained_on}   |   ${result.model_info.pathologies_count} pathologies   |   ${result.model_info.xai_method}`,
-                MX + 10, y + 28,
-            );
-            doc.setFontSize(7); tc(C.slate400);
-            t('⚠ For educational/research use only. Not a substitute for professional radiological review.', MX + 10, y + 40);
-            y += 52;
+            y = rowY + 36;
         }
 
     /* ══════════════════════════════════════════════════════════════
@@ -368,113 +343,108 @@ export const downloadReportPdf = (input: PdfReportInput) => {
     ══════════════════════════════════════════════════════════════ */
     } else if (isLabResult(input.result)) {
         const result = input.result;
-        const assessColor = result.assessment?.toLowerCase() === 'normal' ? C.normal : C.moderate;
-        const assessLight = result.assessment?.toLowerCase() === 'normal' ? C.normalLight : C.moderateLight;
 
-        /* overall assessment banner */
-        const interpLines = result.interpretation
-            ? (doc.splitTextToSize(`"${result.interpretation}"`, CW - 36) as string[]).length
-            : 0;
-        const bannerH = 46 + (interpLines > 0 ? interpLines * 11 + 4 : 0);
-        newPageIfNeeded(bannerH + 8);
-
-        fc(assessLight); dc(assessColor);
-        doc.roundedRect(MX, y, CW, bannerH, 4, 4, 'FD');
-        fc(assessColor); doc.rect(MX, y, 4, bannerH, 'F');
-
-        doc.setFont('helvetica', 'bold'); doc.setFontSize(14); tc(assessColor);
-        t(`Overall Status: ${result.assessment}`, MX + 14, y + 18);
-
-        doc.setFont('helvetica', 'normal'); doc.setFontSize(9); tc(C.slate600);
-        t(`Confidence: ${(result.confidence * 100).toFixed(1)}%  based on ${result.parameters.length} analyzed parameters.`, MX + 14, y + 33);
+        // Prominent Status top of document
+        newPageIfNeeded(60);
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(14); tc(C.slate700);
+        t('OVERALL STATUS', MX, y);
+        y += 28;
+        
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(20); tc(sevColor(result.assessment));
+        t(stripEmojis(result.assessment).toUpperCase(), MX, y);
+        
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(11); tc(C.slate600);
+        t(`Confidence: ${(result.confidence * 100).toFixed(1)}%     |     Parameters analyzed: ${result.parameters.length}`, CW/2 + MX - 40, y);
+        y += 24;
 
         if (result.interpretation) {
-            doc.setFont('helvetica', 'italic'); doc.setFontSize(8); tc(C.slate700);
-            let iy = y + 43;
-            (doc.splitTextToSize(`"${result.interpretation}"`, CW - 36) as string[]).forEach((line) => {
-                t(line, MX + 14, iy); iy += 11;
-            });
+            newPageIfNeeded(40);
+            doc.setFont('helvetica', 'normal'); doc.setFontSize(11); tc(C.slate700);
+            const lines = doc.splitTextToSize(`"${stripEmojis(result.interpretation)}"`, CW);
+            lines.forEach((line: string) => { t(line, MX, y); y += 14; });
+            y += 16;
         }
-        y += bannerH + 12;
 
         /* parameters */
-        sectionHeader('Detailed Parameter Analysis');
+        sectionHeader('DETAILED PARAMETER ANALYSIS');
 
-        result.parameters.forEach((param) => {
-            const sc: RGB = param.status === 'normal'   ? C.normal
-                          : param.status === 'critical' ? C.critical
-                          : param.status === 'abnormal' ? C.high
-                          : C.slate600;
+        fc(C.tealLight); dc(C.slate200); doc.setLineWidth(1); doc.rect(MX, y, CW, 24, 'FD');
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(11); tc(C.teal);
+        t('PARAMETER', MX + 12, y + 16);
+        t('VALUE', MX + CW * 0.45, y + 16);
+        t('REFERENCE RANGE', MX + CW * 0.65, y + 16);
+        t('STATUS', MX + CW * 0.85, y + 16);
+        y += 24;
 
-            newPageIfNeeded(34);
-            fc(C.slate100); dc(C.slate200);
-            doc.roundedRect(MX, y, CW, 28, 3, 3, 'FD');
+        result.parameters.forEach((param, i) => {
+            const calculatedStatus = calculateParameterStatus(param);
 
-            // colored left indicator
-            fc(sc); doc.roundedRect(MX, y, 4, 28, 2, 2, 'F');
+            newPageIfNeeded(36);
+            const bg = i % 2 === 0 ? C.white : C.grayBox;
+            fc(bg); dc(C.slate200); doc.setLineWidth(0.5);
+            doc.rect(MX, y, CW, 32, 'FD'); // Zebra stripes
+            
+            doc.setFont('helvetica', 'bold'); doc.setFontSize(12); tc(C.dark); // Columns are bold
+            t(stripEmojis(param.name).toUpperCase(), MX + 12, y + 20);
 
-            // status dot
-            fc(sc); doc.ellipse(MX + 14, y + 14, 3.5, 3.5, 'F');
-
-            // name
-            doc.setFont('helvetica', 'bold'); doc.setFontSize(9); tc(C.dark);
-            t(param.name.toUpperCase(), MX + 24, y + 11);
-
-            // reference range
-            doc.setFont('helvetica', 'normal'); doc.setFontSize(7); tc(C.slate400);
-            t(`Ref: ${param.reference_range}`, MX + 24, y + 22);
-
-            // progress bar (middle)
-            const barX = MX + 130;
-            const barW = CW - 230;
-            progressBar(barX, y + 11, barW, Math.min(100, Math.max(0, param.percentage)), sc);
-
-            // value (right)
-            doc.setFont('helvetica', 'bold'); doc.setFontSize(11); tc(sc);
+            doc.setFont('helvetica', 'bold'); doc.setFontSize(11); tc(C.dark);
             const valStr = `${param.value}${param.unit ? ` ${param.unit}` : ''}`;
-            t(valStr, PW - MX - 58, y + 14, { align: 'right' });
+            t(valStr, MX + CW * 0.45, y + 20);
 
-            // status badge
-            const badgeSev = param.status === 'abnormal' ? 'high' : param.status;
-            sevBadge(badgeSev, PW - MX - 54, y + 14);
+            doc.setFont('helvetica', 'normal'); doc.setFontSize(11); tc(C.slate600);
+            t(stripEmojis(param.reference_range), MX + CW * 0.65, y + 20);
 
-            y += 34;
+            sevBadge(calculatedStatus, MX + CW * 0.85, y + 20); // Status inside column
+            y += 32;
         });
+        y += 24;
 
-        /* recommendations */
-        sectionHeader('Recommendations', C.normal);
+        /* recommendations — keep entire section together (KeepTogether equivalent) */
         if (result.recommendations?.length) {
-            result.recommendations.forEach((rec) => {
-                const lines = (doc.splitTextToSize(rec, CW - 30) as string[]).length;
-                const rh = lines * 12 + 14;
-                newPageIfNeeded(rh + 6);
-                fc(C.normalLight); dc(C.normal);
-                doc.roundedRect(MX, y, CW, rh, 3, 3, 'FD');
-                fc(C.normal); doc.ellipse(MX + 14, y + rh / 2, 3, 3, 'F');
-                doc.setFont('helvetica', 'normal'); doc.setFontSize(9); tc(C.dark);
-                (doc.splitTextToSize(rec, CW - 32) as string[]).forEach((line, i) =>
-                    t(line, MX + 24, y + 13 + i * 12));
-                y += rh + 6;
+            // Pre-calculate every card's height to decide up-front whether the
+            // whole section fits on the remaining page or needs a fresh page.
+            doc.setFont('helvetica', 'normal'); doc.setFontSize(11);
+            const recHeights = result.recommendations.map((rec) => {
+                const lines = doc.splitTextToSize(`•  ${stripEmojis(rec)}`, CW - 24) as string[];
+                return lines.length * 14 + 16 + 12; // card + gap
             });
-        } else {
-            writeLine('No specific recommendations available.', MX, 9, C.slate400);
+            const sectionTotalH = 52 + recHeights.reduce((a, b) => a + b, 0); // 52 = sectionHeader
+
+            // Jump to a new page before drawing the header so nothing is orphaned.
+            if (y + sectionTotalH > PH - 45) {
+                doc.addPage(); y = 85;
+            }
+
+            sectionHeader('RECOMMENDATIONS');
+            result.recommendations.forEach((rec) => {
+                const cleanRec = stripEmojis(rec);
+                const lines = doc.splitTextToSize(`•  ${cleanRec}`, CW - 24) as string[];
+                const rh = lines.length * 14 + 16;
+                // Safety net: only triggers if a single card alone exceeds one full page.
+                newPageIfNeeded(rh + 16);
+
+                fc(C.yellowLight); dc(C.slate200); doc.setLineWidth(0.5);
+                doc.roundedRect(MX, y, CW, rh, 4, 4, 'FD');
+                fc(C.yellow); doc.roundedRect(MX, y, 4, rh, 4, 4, 'F');
+
+                doc.setFont('helvetica', 'normal'); doc.setFontSize(11); tc(C.dark);
+                lines.forEach((line: string, idx: number) => {
+                    t(line, MX + 16, y + 20 + idx * 14);
+                });
+                y += rh + 12;
+            });
         }
 
-        /* disclaimer */
-        newPageIfNeeded(22);
-        y += 8;
-        doc.setFont('helvetica', 'normal'); doc.setFontSize(7); tc(C.slate400);
-        writeWrapped(
-            'Disclaimer: This AI analysis is for informational purposes only and does not replace professional medical advice. Always consult a qualified healthcare provider.',
-            MX, CW, 7, C.slate400,
-        );
-
     } else {
-        sectionHeader('Result');
-        writeWrapped(JSON.stringify(input.result, null, 2), MX, CW, 8, C.slate600);
+        sectionHeader('RESULT');
+        doc.setFontSize(11); tc(C.slate600);
+        const lines = doc.splitTextToSize(JSON.stringify(input.result, null, 2), CW) as string[];
+        lines.forEach((l: string) => {
+            newPageIfNeeded(14);
+            t(l, MX, y); y += 14;
+        });
     }
 
-    drawFooters();
+    drawFootersAndHeaders();
     doc.save(`${sanitizeFileName(input.fileName)}.pdf`);
 };
-

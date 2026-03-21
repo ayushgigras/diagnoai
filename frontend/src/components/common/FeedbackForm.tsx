@@ -12,6 +12,7 @@ export default function FeedbackForm({ reportId }: FeedbackFormProps) {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        console.log('Submitting feedback for report:', reportId);
         // Simulating submission for now; actual API would take the reportId and payload.
         setTimeout(() => setSubmitted(true), 500);
     };

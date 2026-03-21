@@ -14,8 +14,9 @@ class ReportCreate(ReportBase):
 class ReportResponse(ReportBase):
     id: int
     doctor_id: Optional[int] = None
-    doctor_name: Optional[str] = None # Added for admin dashboard
-    patient_name: Optional[str] = None # Added for admin dashboard
+    doctor_name: Optional[str] = None   # Added for admin dashboard
+    user_full_name: Optional[str] = None  # Account owner (submitting user)
+    patient_name: Optional[str] = None  # Added for admin dashboard
     patient_first_name: Optional[str] = None
     patient_last_name: Optional[str] = None
     patient_date_of_birth: Optional[str] = None

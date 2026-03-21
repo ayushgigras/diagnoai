@@ -164,6 +164,28 @@ const AdminDashboard = () => {
         r.status?.toLowerCase().includes(searchQuery.toLowerCase())
     );
 
+    // Resolve the best available patient name for a report.
+    // Falls back to the account owner's full_name (user_full_name) which the
+    // admin /reports endpoint returns alongside each report.
+    const getAdminPatientName = (report: any): string => {
+        const candidates = [
+            report.patient_name,
+            report.patient_first_name && report.patient_last_name
+                ? `${report.patient_first_name} ${report.patient_last_name}`.trim()
+                : null,
+            report.patient_first_name || report.patient_last_name
+                ? `${report.patient_first_name || ''} ${report.patient_last_name || ''}`.trim()
+                : null,
+        ];
+        const stored = candidates.find(
+            (v) => v && v.trim() && v.toLowerCase() !== 'unknown patient'
+        );
+        if (stored) return stored;
+        // user_full_name = the account name of whoever submitted this report
+        if (report.user_full_name) return report.user_full_name;
+        return `Patient ID: ${report.patient_id}`;
+    };
+
     return (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
             <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
@@ -397,7 +419,7 @@ const AdminDashboard = () => {
                                                 </span>
                                             </td>
                                             <td className="px-6 py-4 text-sm text-slate-700 dark:text-slate-300">
-                                                {report.patient_name || `ID: ${report.patient_id}`}
+                                                {getAdminPatientName(report)}
                                             </td>
                                             <td className="px-6 py-4 text-sm text-slate-700 dark:text-slate-300 italic">
                                                 {report.doctor_name || 'System / None'}
@@ -568,7 +590,7 @@ const AdminDashboard = () => {
                                 <div className="grid grid-cols-2 gap-8 mb-8">
                                     <div className="p-4 bg-slate-50 dark:bg-slate-800/40 rounded-xl">
                                         <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Patient Details</div>
-                                        <div className="text-sm font-bold text-slate-900 dark:text-white">{viewingReport.patient_name || 'N/A'}</div>
+                                        <div className="text-sm font-bold text-slate-900 dark:text-white">{getAdminPatientName(viewingReport)}</div>
                                         <div className="text-xs text-slate-500">Patient ID: {viewingReport.patient_id}</div>
                                     </div>
                                     <div className="p-4 bg-slate-50 dark:bg-slate-800/40 rounded-xl">

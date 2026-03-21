@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import FeedbackForm from '../common/FeedbackForm';
+import { calculateParameterStatus } from '../../utils/labUtils';
 
 interface LabResultsProps {
     result: LabResult;
@@ -15,6 +16,8 @@ interface LabResultsProps {
 const STATUS_CONFIG = {
     normal: { label: 'Normal', color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-500/10', border: 'border-emerald-500/30', bar: 'bg-emerald-500', dot: 'bg-emerald-500' },
     abnormal: { label: 'Abnormal', color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-500/10', border: 'border-amber-500/30', bar: 'bg-amber-500', dot: 'bg-amber-500' },
+    high: { label: 'High', color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-500/10', border: 'border-amber-500/30', bar: 'bg-amber-500', dot: 'bg-amber-500' },
+    low: { label: 'Low', color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-500/10', border: 'border-amber-500/30', bar: 'bg-amber-500', dot: 'bg-amber-500' },
     critical: { label: 'Critical', color: 'text-red-600 dark:text-red-400', bg: 'bg-red-500/10', border: 'border-red-500/30', bar: 'bg-red-500', dot: 'bg-red-500' },
     unknown: { label: 'Unknown', color: 'text-slate-500', bg: 'bg-slate-500/10', border: 'border-slate-500/30', bar: 'bg-slate-500', dot: 'bg-slate-500' },
 };
@@ -24,7 +27,7 @@ function StatusBadge({ status }: { status: string }) {
     return (
         <span className={`inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-full ${cfg.color} ${cfg.bg} border ${cfg.border} uppercase tracking-wider`}>
             {status === 'normal' && <CheckCircle2 className="w-3 h-3" />}
-            {status === 'abnormal' && <AlertCircle className="w-3 h-3" />}
+            {(status === 'high' || status === 'low') && <AlertCircle className="w-3 h-3" />}
             {status === 'critical' && <AlertTriangle className="w-3 h-3" />}
             {status === 'unknown' && <HelpCircle className="w-3 h-3" />}
             {cfg.label}
@@ -34,6 +37,8 @@ function StatusBadge({ status }: { status: string }) {
 
 function getDirectionIcon(status: string, percentage: number) {
     if (status === 'normal') return <Minus className="w-3.5 h-3.5 text-emerald-500" />;
+    if (status === 'high') return <ArrowUp className="w-3.5 h-3.5 text-red-500" />;
+    if (status === 'low') return <ArrowDown className="w-3.5 h-3.5 text-red-500" />;
     if (percentage > 60) return <ArrowUp className="w-3.5 h-3.5 text-red-500" />;
     if (percentage < 40) return <ArrowDown className="w-3.5 h-3.5 text-red-500" />;
     return <Minus className="w-3.5 h-3.5 text-slate-400" />;
@@ -41,14 +46,15 @@ function getDirectionIcon(status: string, percentage: number) {
 
 /* ─── Enhanced Parameter Card ─────────────────────────────────────────── */
 const ParameterCard = ({ param }: { param: LabParameter }) => {
-    const cfg = STATUS_CONFIG[param.status as keyof typeof STATUS_CONFIG] ?? STATUS_CONFIG.unknown;
+    const calculatedStatus = calculateParameterStatus(param);
+    const cfg = STATUS_CONFIG[calculatedStatus as keyof typeof STATUS_CONFIG] ?? STATUS_CONFIG.unknown;
     const markerPos = Math.min(100, Math.max(0, param.percentage));
 
     return (
         <div className={cn(
             "rounded-xl border bg-white dark:bg-slate-900 p-5 transition-all hover:shadow-md",
-            param.status === 'critical' ? 'border-red-300 dark:border-red-500/30' :
-            param.status === 'abnormal' ? 'border-amber-300 dark:border-amber-500/30' :
+            calculatedStatus === 'critical' ? 'border-red-300 dark:border-red-500/30' :
+            (calculatedStatus === 'high' || calculatedStatus === 'low') ? 'border-amber-300 dark:border-amber-500/30' :
             'border-slate-200 dark:border-slate-800'
         )}>
             {/* Header Row */}
@@ -60,7 +66,7 @@ const ParameterCard = ({ param }: { param: LabParameter }) => {
                             {param.name}
                         </h4>
                         <div className="flex items-center gap-1.5 mt-0.5">
-                            {getDirectionIcon(param.status, param.percentage)}
+                            {getDirectionIcon(calculatedStatus, param.percentage)}
                             <span className="text-[10px] sm:text-xs text-slate-400">
                                 Ref: {param.reference_range}
                             </span>
@@ -69,7 +75,7 @@ const ParameterCard = ({ param }: { param: LabParameter }) => {
                 </div>
                 <div className="flex flex-row sm:flex-col items-center sm:items-end justify-between w-full sm:w-auto gap-2">
                     <div className="flex items-baseline gap-1.5">
-                        <span className={`text-xl sm:text-2xl font-black ${param.status === 'normal' ? 'text-slate-900 dark:text-white' : cfg.color}`}>
+                        <span className={`text-xl sm:text-2xl font-black ${calculatedStatus === 'normal' ? 'text-slate-900 dark:text-white' : cfg.color}`}>
                             {param.value}
                         </span>
                         {param.flag && (
@@ -84,7 +90,7 @@ const ParameterCard = ({ param }: { param: LabParameter }) => {
                             <span className="text-[10px] sm:text-xs text-slate-400 font-medium">{param.unit}</span>
                         )}
                     </div>
-                    <StatusBadge status={param.status} />
+                    <StatusBadge status={calculatedStatus} />
                 </div>
             </div>
 
@@ -118,9 +124,12 @@ const ParameterCard = ({ param }: { param: LabParameter }) => {
 
 /* ─── Main Component ──────────────────────────────────────────────────── */
 const LabResults = ({ result }: LabResultsProps) => {
-    const normalCount = result.parameters.filter(p => p.status === 'normal').length;
-    const abnormalCount = result.parameters.filter(p => p.status === 'abnormal').length;
-    const criticalCount = result.parameters.filter(p => p.status === 'critical').length;
+    const normalCount = result.parameters.filter(p => calculateParameterStatus(p) === 'normal').length;
+    const abnormalCount = result.parameters.filter(p => {
+        const s = calculateParameterStatus(p);
+        return s === 'high' || s === 'low';
+    }).length;
+    const criticalCount = result.parameters.filter(p => calculateParameterStatus(p) === 'critical').length;
     const totalCount = result.parameters.length;
     const isNormal = result.assessment === 'Normal';
 

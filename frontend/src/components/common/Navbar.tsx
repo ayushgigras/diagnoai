@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Activity, Menu, X, User as UserIcon, LogOut } from 'lucide-react';
+import { Menu, X, User as UserIcon, LogOut } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useState } from 'react';
 import useAuthStore from '../../store/useAuthStore';
@@ -34,10 +34,16 @@ const Navbar = () => {
         <nav className="sticky top-0 z-50 w-full border-b border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-slate-950/80 backdrop-blur-md">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="flex items-center justify-between h-16">
-                    <Link to="/" className="flex items-center space-x-2">
-                        <Activity className="h-8 w-8 text-primary" />
-                        <span className="text-xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
-                            DiagnoAI
+                    <Link to="/" className="flex items-center space-x-3">
+                        <img
+                            src="/logo.png"
+                            alt="DiagnoAI Logo"
+                            className="h-10 w-auto object-contain dark:[mix-blend-mode:screen]"
+                            style={{ height: 40 }}
+                        />
+                        <span className="text-2xl font-bold tracking-tight">
+                            <span className="text-teal-900 dark:text-blue-500">Diagno</span>
+                            <span className="text-teal-900 dark:text-emerald-500">AI</span>
                         </span>
                     </Link>
 
