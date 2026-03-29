@@ -45,7 +45,6 @@ class UserCreate(UserBase):
 class UserResponse(UserBase):
     id: int
     is_active: bool
-    is_verified: bool
     created_at: datetime
 
     class Config:
@@ -54,9 +53,7 @@ class UserResponse(UserBase):
 
 class GoogleLoginRequest(BaseModel):
     credential: str
-    is_registration: bool = False
     role: Optional[str] = "patient"
-    admin_secret: Optional[str] = None
 
 
 class ForgotPasswordRequest(BaseModel):
@@ -81,9 +78,3 @@ class ResetPasswordRequest(BaseModel):
         if not re.search(r"[!@#$%^&*(),.?\":{}|<>]", v):
             raise ValueError("Password must contain at least one special character")
         return v
-
-class VerifyEmailRequest(BaseModel):
-    token: str
-
-class ResendVerificationRequest(BaseModel):
-    email: EmailStr

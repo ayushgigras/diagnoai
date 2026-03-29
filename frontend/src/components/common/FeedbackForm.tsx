@@ -1,25 +1,40 @@
 import { useState } from 'react';
-import { ThumbsUp, ThumbsDown, MessageSquare, Send } from 'lucide-react';
+import { ThumbsUp, ThumbsDown, MessageSquare, Send, Loader2 } from 'lucide-react';
+import api from '../../services/api';
 
 interface FeedbackFormProps {
-    reportId?: string | number | null;
+    reportId?: number | null;
+    reportType?: 'xray' | 'lab';
 }
 
-export default function FeedbackForm({ reportId }: FeedbackFormProps) {
+export default function FeedbackForm({ reportId, reportType }: FeedbackFormProps) {
     const [rating, setRating] = useState<'up' | 'down' | null>(null);
     const [comment, setComment] = useState('');
     const [submitted, setSubmitted] = useState(false);
+    const [loading, setLoading] = useState(false);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        console.log('Submitting feedback for report:', reportId);
-        // Simulating submission for now; actual API would take the reportId and payload.
-        setTimeout(() => setSubmitted(true), 500);
+        if (!rating) return;
+        setLoading(true);
+        try {
+            await api.post('/feedback', {
+                report_id: reportId ?? null,
+                report_type: reportType ?? null,
+                rating,
+                comment: comment.trim() || null,
+            });
+            setSubmitted(true);
+        } catch {
+            // Error is already handled by the global interceptor (toast shown)
+        } finally {
+            setLoading(false);
+        }
     };
 
     if (submitted) {
         return (
-            <div className="bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 p-6 rounded-xl border border-emerald-200 dark:border-emerald-500/20 text-center animate-in fade-in zoom-in-95 duration-300 mt-8">
+            <div className="bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 p-6 rounded-xl border border-emerald-200 dark:border-emerald-500/20 text-center mt-8">
                 <ThumbsUp className="w-8 h-8 mx-auto mb-2" />
                 <h3 className="text-lg font-bold">Thank you for your feedback!</h3>
                 <p className="text-sm mt-1 opacity-80">Your insights help improve our AI diagnostic models.</p>
@@ -36,7 +51,7 @@ export default function FeedbackForm({ reportId }: FeedbackFormProps) {
             <p className="text-sm text-slate-500 mb-4">
                 Was this AI analysis helpful and accurate? Let us know.
             </p>
-            
+
             <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="flex gap-4">
                     <button
@@ -56,7 +71,7 @@ export default function FeedbackForm({ reportId }: FeedbackFormProps) {
                         Inaccurate
                     </button>
                 </div>
-                
+
                 <div>
                     <textarea
                         value={comment}
@@ -66,15 +81,17 @@ export default function FeedbackForm({ reportId }: FeedbackFormProps) {
                         className="w-full p-3 rounded-lg border border-slate-200 dark:border-slate-700 dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-primary shadow-sm text-sm dark:text-white resize-none"
                     />
                 </div>
-                
+
                 <button
                     type="submit"
-                    disabled={!rating}
+                    disabled={!rating || loading}
                     className="w-full py-3 bg-primary hover:bg-primary/90 disabled:bg-slate-300 disabled:dark:bg-slate-800 disabled:text-slate-500 disabled:cursor-not-allowed text-white rounded-lg font-bold flex items-center justify-center gap-2 transition-all"
                 >
-                    <Send className="w-4 h-4" /> Submit Feedback
+                    {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                    {loading ? 'Submitting…' : 'Submit Feedback'}
                 </button>
             </form>
         </div>
     );
 }
+

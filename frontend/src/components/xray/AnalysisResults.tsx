@@ -427,7 +427,7 @@ const AnalysisResults = ({ result, imagePreview }: AnalysisResultsProps) => {
                 </div>
             )}
 
-            <FeedbackForm />
+            <FeedbackForm reportType="xray" />
 
         </div>
     );

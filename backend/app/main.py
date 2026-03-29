@@ -9,7 +9,7 @@ import os
 import secrets
 
 from app.config import settings
-from app.routers import xray, lab, auth, tasks, reports, ws, admin
+from app.routers import xray, lab, auth, tasks, reports, ws, admin, feedback
 
 # --------------- Rate Limiter ---------------
 ratelimit_enabled = os.getenv("RATELIMIT_ENABLED", "true").lower() != "false"
@@ -42,7 +42,16 @@ async def add_security_headers(request: Request, call_next):
     response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
     response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
-    response.headers["Content-Security-Policy"] = "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'"
+    response.headers["X-Permitted-Cross-Domain-Policies"] = "none"
+    response.headers["Content-Security-Policy"] = (
+        "default-src 'self'; "
+        "script-src 'self'; "
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+        "font-src 'self' https://fonts.gstatic.com; "
+        "img-src 'self' data: blob:; "
+        "connect-src 'self'; "
+        "frame-ancestors 'none';"
+    )
     return response
 
 # --------------- CSRF Middleware ---------------
@@ -91,6 +100,7 @@ app.include_router(tasks.router, prefix="/api/tasks", tags=["Background Tasks"])
 app.include_router(reports.router, prefix="/api/reports", tags=["Reports"])
 app.include_router(ws.router, prefix="/api", tags=["WebSockets"])
 app.include_router(admin.router, prefix="/api/admin", tags=["Admin"])
+app.include_router(feedback.router, prefix="/api", tags=["Feedback"])
 
 # --------------- Static Files ---------------
 UPLOAD_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "uploads")

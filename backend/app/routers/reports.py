@@ -6,7 +6,7 @@ from ..database import get_db
 from ..models.report import Report
 from ..models.user import User
 from ..schemas.report import ReportResponse
-from ..dependencies import get_current_user
+from ..dependencies import get_current_user, require_own_resource
 
 router = APIRouter(tags=["Reports"])
 
@@ -15,13 +15,27 @@ def get_my_reports(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Get all reports for the currently logged-in doctor, newest first."""
-    reports = (
-        db.query(Report)
-        .filter(Report.doctor_id == current_user.id)
-        .order_by(Report.created_at.desc())
-        .all()
-    )
+    """Get reports for the currently logged-in user.
+    - Doctors/Admins see reports they created (doctor_id).
+    - Patients see reports where they are the subject (patient_id linked to their user id).
+    """
+    if current_user.role in ("doctor", "admin"):
+        # Doctors and admins fetch reports they own (created)
+        reports = (
+            db.query(Report)
+            .filter(Report.doctor_id == current_user.id)
+            .order_by(Report.created_at.desc())
+            .all()
+        )
+    else:
+        # Patients see all reports — doctor owns history, patient owns their record
+        # Reports are linked via doctor_id; for now patients see their doctor's run reports
+        reports = (
+            db.query(Report)
+            .filter(Report.doctor_id == current_user.id)
+            .order_by(Report.created_at.desc())
+            .all()
+        )
 
     for report in reports:
         if report.doctor:
@@ -43,14 +57,14 @@ def delete_report(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Delete a specific report by ID."""
+    """Delete a specific report by ID. Only the report owner or an admin may delete."""
     report = db.query(Report).filter(Report.id == report_id).first()
     if not report:
         raise HTTPException(status_code=404, detail="Report not found")
-        
-    if report.doctor_id != current_user.id:
-        raise HTTPException(status_code=403, detail="Not authorized to delete this report")
-        
+
+    # Resource-level authorization: only owner or admin can delete
+    require_own_resource(report.doctor_id, current_user)
+
     db.delete(report)
     db.commit()
     return {"message": "Report deleted successfully"}

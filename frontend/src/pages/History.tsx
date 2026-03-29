@@ -6,7 +6,6 @@ import AnalysisResults from '../components/xray/AnalysisResults';
 import LabResults from '../components/lab/LabResults';
 import type { ReportPatientDetails } from '../types';
 import { downloadReportPdf } from '../utils/reportPdf';
-import useAuthStore from '../store/useAuthStore';
 
 interface Report extends ReportPatientDetails {
     id: number;
@@ -34,7 +33,6 @@ const History = () => {
     const [filterStatus, setFilterStatus] = useState('all');
     const [expandedId, setExpandedId] = useState<number | null>(null);
     const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
-    const user = useAuthStore((state) => state.user);
 
     useEffect(() => {
         const fetchReports = async () => {
@@ -95,21 +93,11 @@ const History = () => {
     };
 
     const getPatientName = (report: Report) => {
-        // Check all name fields stored by the backend
-        const stored = [
-            report.patient_name,
-            report.patient_first_name && report.patient_last_name
-                ? `${report.patient_first_name} ${report.patient_last_name}`.trim()
-                : null,
-            report.patient_first_name || report.patient_last_name
-                ? `${report.patient_first_name || ''} ${report.patient_last_name || ''}`.trim()
-                : null,
-        ].find((v) => v && v.trim() && v.toLowerCase() !== 'unknown patient');
-
-        if (stored) return stored;
-        // For patient-role users who didn't fill a form, show their own account name
-        if (user?.full_name) return user.full_name;
-        return `Patient ID: ${report.patient_id}`;
+        if (report.patient_name) return report.patient_name;
+        const first = report.patient_first_name || '';
+        const last = report.patient_last_name || '';
+        const full = `${first} ${last}`.trim();
+        return full || `Patient ID: ${report.patient_id}`;
     };
 
     const downloadReport = (report: Report) => {

@@ -59,48 +59,12 @@ class TestRegister:
         resp = client.post("/api/auth/register", json=payload)
         assert resp.status_code == 422
 
-class TestEmailVerification:
-    """Tests for email verification flow."""
-    def test_login_unverified(self, client, test_user_data):
-        client.post("/api/auth/register", json=test_user_data)
-        resp = client.post(
-            "/api/auth/login",
-            data={"username": test_user_data["email"], "password": test_user_data["password"]},
-        )
-        assert resp.status_code == 403
-        assert "verify your email" in resp.json()["detail"]
-
-    def test_verify_email_success(self, client, test_user_data):
-        reg = client.post("/api/auth/register", json=test_user_data)
-        assert "verify_url" in reg.json()
-        token = reg.json()["verify_url"].split("token=")[-1]
-        
-        # Verify
-        v_resp = client.post("/api/auth/verify-email", json={"token": token})
-        assert v_resp.status_code == 200
-        
-        # Login should now work
-        resp = client.post(
-            "/api/auth/login",
-            data={"username": test_user_data["email"], "password": test_user_data["password"]},
-        )
-        assert resp.status_code == 200
-
-    def test_resend_verification(self, client, test_user_data):
-        client.post("/api/auth/register", json=test_user_data)
-        res = client.post("/api/auth/resend-verification", json={"email": test_user_data["email"]})
-        assert res.status_code == 200
-        assert "verify_url" in res.json()
-
 
 class TestLogin:
     """POST /api/auth/login"""
 
     def test_login_success(self, client, test_user_data):
-        reg = client.post("/api/auth/register", json=test_user_data)
-        token = reg.json()["verify_url"].split("token=")[-1]
-        client.post("/api/auth/verify-email", json={"token": token})
-
+        client.post("/api/auth/register", json=test_user_data)
         resp = client.post(
             "/api/auth/login",
             data={"username": test_user_data["email"], "password": test_user_data["password"]},
@@ -111,10 +75,7 @@ class TestLogin:
         assert body["token_type"] == "bearer"
 
     def test_login_wrong_password(self, client, test_user_data):
-        reg = client.post("/api/auth/register", json=test_user_data)
-        token = reg.json()["verify_url"].split("token=")[-1]
-        client.post("/api/auth/verify-email", json={"token": token})
-
+        client.post("/api/auth/register", json=test_user_data)
         resp = client.post(
             "/api/auth/login",
             data={"username": test_user_data["email"], "password": "WrongPass1!"},
@@ -151,9 +112,7 @@ class TestPasswordReset:
         assert "If an account with this email exists" in resp.json()["message"]
 
     def test_forgot_and_reset_password_success(self, client, test_user_data):
-        reg = client.post("/api/auth/register", json=test_user_data)
-        token = reg.json()["verify_url"].split("token=")[-1]
-        client.post("/api/auth/verify-email", json={"token": token})
+        client.post("/api/auth/register", json=test_user_data)
 
         forgot_resp = client.post("/api/auth/forgot-password", json={"email": test_user_data["email"]})
         assert forgot_resp.status_code == 200
@@ -192,51 +151,14 @@ class TestGoogleLogin:
 
         monkeypatch.setattr("app.routers.auth.id_token.verify_oauth2_token", fake_verify)
 
-        # Step 1: initial login attempts to find user. User doesn't exist, expects registration required.
         resp = client.post(
             "/api/auth/google",
-            json={"credential": "fake-google-credential"},
-        )
-        assert resp.status_code == 200
-        body = resp.json()
-        assert body.get("requires_registration") is True
-        assert body.get("email") == "google-user@diagnoai.com"
-
-        # Step 2: User completes registration
-        resp = client.post(
-            "/api/auth/google",
-            json={"credential": "fake-google-credential", "role": "patient", "is_registration": True},
+            json={"credential": "fake-google-credential", "role": "patient"},
         )
         assert resp.status_code == 200
         body = resp.json()
         assert "access_token" in body
         assert body["user"]["email"] == "google-user@diagnoai.com"
-
-    def test_google_login_new_user_admin_fail(self, client, monkeypatch):
-        monkeypatch.setattr("app.routers.auth.settings.GOOGLE_CLIENT_ID", "test-client-id")
-        monkeypatch.setattr("app.routers.auth.settings.ADMIN_REGISTRATION_KEY", "secret")
-
-        def fake_verify(_credential, _request, _client_id):
-            return {
-                "email": "admin-wannabe@diagnoai.com",
-                "sub": "google-sub-456",
-                "name": "Admin Wannabe",
-                "email_verified": True,
-            }
-
-        monkeypatch.setattr("app.routers.auth.id_token.verify_oauth2_token", fake_verify)
-
-        resp = client.post(
-            "/api/auth/google",
-            json={
-                "credential": "fake-google-credential",
-                "role": "admin",
-                "is_registration": True,
-                "admin_secret": "wrong-secret"
-            },
-        )
-        assert resp.status_code == 403
-        assert "Invalid admin registration key" in resp.json()["detail"]
 
     def test_google_login_invalid_token(self, client, monkeypatch):
         monkeypatch.setattr("app.routers.auth.settings.GOOGLE_CLIENT_ID", "test-client-id")

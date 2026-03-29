@@ -3,6 +3,7 @@ from fastapi.security import OAuth2PasswordBearer
 from jose import jwt, JWTError
 from sqlalchemy.orm import Session
 from pydantic import ValidationError
+from typing import Any
 
 from .database import get_db
 from .models.user import User
@@ -51,3 +52,15 @@ def get_current_admin(current_user: User = Depends(get_current_user)) -> User:
             detail="Admin access required"
         )
     return current_user
+
+
+def require_own_resource(resource_owner_id: int, current_user: User) -> None:
+    """
+    Assert that the current user owns the resource OR is an admin.
+    Raises HTTP 403 if the check fails.
+    """
+    if current_user.role != "admin" and current_user.id != resource_owner_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have permission to access this resource"
+        )

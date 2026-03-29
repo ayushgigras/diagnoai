@@ -97,28 +97,16 @@ def get_all_reports(
     
     # Enrich reports with names
     for report in reports:
-        # Always expose the submitting user's full name so JS can use it
         if report.doctor:
             report.doctor_name = report.doctor.full_name
-            report.user_full_name = report.doctor.full_name  # account owner
-        else:
-            report.user_full_name = None
-
         if report.patient:
-            # Doctor filled a patient form — use those details
-            first = report.patient.first_name or ''
-            last  = report.patient.last_name  or ''
-            full  = f"{first} {last}".strip()
-            report.patient_name         = full if full else report.user_full_name
-            report.patient_first_name   = first
-            report.patient_last_name    = last
-            report.patient_date_of_birth    = report.patient.date_of_birth
-            report.patient_gender           = report.patient.gender
-            report.patient_contact_number   = report.patient.contact_number
-            report.patient_address          = report.patient.address
-        else:
-            # Patient-role user ran their own analysis — use their account name
-            report.patient_name = report.user_full_name or ''
+            report.patient_name = f"{report.patient.first_name} {report.patient.last_name}"
+            report.patient_first_name = report.patient.first_name
+            report.patient_last_name = report.patient.last_name
+            report.patient_date_of_birth = report.patient.date_of_birth
+            report.patient_gender = report.patient.gender
+            report.patient_contact_number = report.patient.contact_number
+            report.patient_address = report.patient.address
             
     return reports
 

@@ -90,16 +90,7 @@ const XRayAnalysis = () => {
                 patient_gender: patientDetails.gender,
                 patient_contact_number: patientDetails.contact_number,
                 patient_address: patientDetails.address,
-            } : {
-                // Patient analysing their own scan — use their account name
-                patient_name: user?.full_name || '',
-                patient_first_name: user?.full_name?.split(' ')[0] || '',
-                patient_last_name: user?.full_name?.split(' ').slice(1).join(' ') || '',
-                patient_date_of_birth: '',
-                patient_gender: '',
-                patient_contact_number: '',
-                patient_address: '',
-            },
+            } : null,
             result,
         });
     };

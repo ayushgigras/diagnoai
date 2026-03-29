@@ -263,7 +263,7 @@ const LabResults = ({ result }: LabResultsProps) => {
                     </div>
                 </CardContent>
             </Card>
-            <FeedbackForm />
+            <FeedbackForm reportType="lab" />
         </div>
     );
 };

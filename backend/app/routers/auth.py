@@ -22,8 +22,6 @@ from ..schemas.user import (
     GoogleLoginRequest,
     ForgotPasswordRequest,
     ResetPasswordRequest,
-    VerifyEmailRequest,
-    ResendVerificationRequest,
 )
 from ..config import settings
 from ..utils.security import verify_password, get_password_hash, create_access_token, ACCESS_TOKEN_EXPIRE_MINUTES
@@ -70,99 +68,7 @@ def _send_password_reset_email(to_email: str, reset_url: str) -> bool:
         server.send_message(msg)
     return True
 
-def _send_verification_email(to_email: str, name: str, verify_url: str) -> bool:
-    if not settings.SMTP_HOST or not settings.SMTP_SENDER_EMAIL:
-        return False
-
-    msg = EmailMessage()
-    msg["Subject"] = "Verify your DiagnoAI account"
-    msg["From"] = settings.SMTP_SENDER_EMAIL
-    msg["To"] = to_email
-    
-    html_content = f"""
-    <html>
-      <body style="font-family: Arial, sans-serif; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-        <div style="text-align: center; margin-bottom: 20px;">
-          <h1 style="color: #0f766e; margin: 0;">DiagnoAI</h1>
-        </div>
-        <div style="background-color: #f8fafc; padding: 30px; border-radius: 8px; border: 1px solid #e2e8f0;">
-          <h2 style="margin-top: 0; color: #0f766e;">Welcome to DiagnoAI, {name or 'User'}!</h2>
-          <p>Please verify your email address to activate your account. This link will expire in 24 hours.</p>
-          <div style="text-align: center; margin: 30px 0;">
-            <a href="{verify_url}" style="background-color: #0f766e; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">Verify My Account</a>
-          </div>
-          <p style="font-size: 14px; color: #64748b;">Or copy and paste this link into your browser:<br>
-          <a href="{verify_url}" style="color: #0f766e;">{verify_url}</a></p>
-        </div>
-        <div style="text-align: center; margin-top: 20px; font-size: 12px; color: #94a3b8;">
-          <p>&copy; {datetime.now().year} DiagnoAI. All rights reserved.</p>
-        </div>
-      </body>
-    </html>
-    """
-    msg.add_alternative(html_content, subtype='html')
-
-    try:
-        with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT, timeout=20) as server:
-            if settings.SMTP_USE_TLS:
-                server.starttls()
-            if settings.SMTP_USERNAME and settings.SMTP_PASSWORD:
-                server.login(settings.SMTP_USERNAME, settings.SMTP_PASSWORD)
-            server.send_message(msg)
-        return True
-    except Exception as e:
-        print(f"Failed to send verification email: {e}")
-        return False
-
-def _send_welcome_email(to_email: str, name: str) -> bool:
-    if not settings.SMTP_HOST or not settings.SMTP_SENDER_EMAIL:
-        return False
-
-    msg = EmailMessage()
-    msg["Subject"] = "Welcome to DiagnoAI! 🎉"
-    msg["From"] = settings.SMTP_SENDER_EMAIL
-    msg["To"] = to_email
-    
-    html_content = f"""
-    <html>
-      <body style="font-family: Arial, sans-serif; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-        <div style="text-align: center; margin-bottom: 20px;">
-          <h1 style="color: #0f766e; margin: 0;">DiagnoAI</h1>
-        </div>
-        <div style="background-color: #f8fafc; padding: 30px; border-radius: 8px; border: 1px solid #e2e8f0;">
-          <h2 style="margin-top: 0; color: #0f766e;">Welcome to the future of diagnostics, {name or 'User'}!</h2>
-          <p>Your account is now fully active. Here is a quick overview of what you can do:</p>
-          <ul style="line-height: 1.6;">
-            <li><strong>🔬 X-Ray Analysis:</strong> Upload chest X-rays for instant, AI-powered multi-pathology detection.</li>
-            <li><strong>🧪 Lab Report Analysis:</strong> Upload raw lab reports for OCR extraction and clinical interpretation against standard reference ranges.</li>
-            <li><strong>📊 History Tracking:</strong> All your generated reports are saved securely to your account for easy reference.</li>
-          </ul>
-          <p>Get started by exploring our dashboard and running your first analysis today!</p>
-          <div style="text-align: center; margin: 30px 0;">
-            <a href="{settings.FRONTEND_URL.rstrip('/')}/login" style="background-color: #0f766e; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">Go to Dashboard</a>
-          </div>
-        </div>
-        <div style="text-align: center; margin-top: 20px; font-size: 12px; color: #94a3b8;">
-          <p>&copy; {datetime.now().year} DiagnoAI. All rights reserved.</p>
-        </div>
-      </body>
-    </html>
-    """
-    msg.add_alternative(html_content, subtype='html')
-
-    try:
-        with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT, timeout=20) as server:
-            if settings.SMTP_USE_TLS:
-                server.starttls()
-            if settings.SMTP_USERNAME and settings.SMTP_PASSWORD:
-                server.login(settings.SMTP_USERNAME, settings.SMTP_PASSWORD)
-            server.send_message(msg)
-        return True
-    except Exception as e:
-        print(f"Failed to send welcome email: {e}")
-        return False
-
-@router.post("/register")
+@router.post("/register", response_model=UserResponse)
 @limiter.limit("5/minute")
 def register(request: Request, user_in: UserCreate, db: Session = Depends(get_db)):
     # Check if user exists
@@ -178,35 +84,23 @@ def register(request: Request, user_in: UserCreate, db: Session = Depends(get_db
     requested_role = user_in.role if user_in.role in ["doctor", "patient", "admin"] else "patient"
     
     if requested_role == "admin":
+        from ..config import settings
         if user_in.admin_secret != settings.ADMIN_REGISTRATION_KEY:
             raise HTTPException(
                 status_code=403,
                 detail="Invalid admin registration key."
             )
     
-    raw_token = secrets.token_urlsafe(48)
     user = User(
         email=user_in.email,
         hashed_password=get_password_hash(user_in.password),
         full_name=user_in.full_name,
-        role=requested_role,
-        is_verified=False,
-        verification_token_hash=_hash_reset_token(raw_token),
-        verification_token_expires_at=datetime.now(timezone.utc) + timedelta(hours=24)
+        role=requested_role
     )
     db.add(user)
     db.commit()
     db.refresh(user)
-
-    verify_url = f"{settings.FRONTEND_URL.rstrip('/')}/verify-email?token={raw_token}"
-    _send_verification_email(user.email, user.full_name, verify_url)
-
-    # Convert to dict to easily append developer fields if needed
-    user_dict = UserResponse.model_validate(user).model_dump()
-    if settings.APP_ENV.lower() in {"development", "dev", "local", "test", "testing"}:
-        user_dict["verify_url"] = verify_url
-
-    return user_dict
+    return user
 
 @router.post("/login")
 @limiter.limit("10/minute")
@@ -221,11 +115,6 @@ def login(request: Request, db: Session = Depends(get_db), form_data: OAuth2Pass
         )
     elif not user.is_active:
         raise HTTPException(status_code=400, detail="Inactive user")
-    elif not user.is_verified:
-        raise HTTPException(
-            status_code=403, 
-            detail="Please verify your email address. Check your inbox or request a new verification email."
-        )
         
     access_token = _issue_access_token(user)
     
@@ -255,17 +144,10 @@ def google_login(request: Request, payload: GoogleLoginRequest, db: Session = De
     if not email or not google_sub or not email_verified:
         raise HTTPException(status_code=400, detail="Google account email is unavailable or unverified")
 
+    requested_role = payload.role if payload.role in ["doctor", "patient"] else "patient"
+
     user = db.query(User).filter(User.email == email).first()
     if not user:
-        if not payload.is_registration:
-            return {"requires_registration": True, "email": email, "name": full_name}
-            
-        requested_role = payload.role if payload.role in ["doctor", "patient", "admin"] else "patient"
-        
-        if requested_role == "admin":
-            if payload.admin_secret != settings.ADMIN_REGISTRATION_KEY:
-                raise HTTPException(status_code=403, detail="Invalid admin registration key.")
-                
         user = User(
             email=email,
             hashed_password=get_password_hash(secrets.token_urlsafe(32)),
@@ -273,14 +155,10 @@ def google_login(request: Request, payload: GoogleLoginRequest, db: Session = De
             role=requested_role,
             google_sub=google_sub,
             auth_provider="google",
-            is_verified=True,
         )
         db.add(user)
         db.commit()
         db.refresh(user)
-        
-        # Send Welcome Email directly for new Google users
-        _send_welcome_email(user.email, user.full_name)
     else:
         if user.google_sub and user.google_sub != google_sub:
             raise HTTPException(status_code=409, detail="Google account mismatch for this email")
@@ -323,7 +201,7 @@ def forgot_password(request: Request, payload: ForgotPasswordRequest, db: Sessio
     except Exception:
         email_sent = False
 
-    if settings.APP_ENV.lower() in {"development", "dev", "local", "test", "testing"}:
+    if settings.APP_ENV.lower() in {"development", "dev", "local"}:
         response["reset_url"] = reset_url
         response["email_sent"] = email_sent
 
@@ -348,56 +226,9 @@ def reset_password(request: Request, payload: ResetPasswordRequest, db: Session 
     user.hashed_password = get_password_hash(payload.new_password)
     user.password_reset_token_hash = None
     user.password_reset_token_expires_at = None
+    db.commit()
+
     return {"message": "Password has been reset successfully"}
-
-@router.post("/verify-email")
-@limiter.limit("5/minute")
-def verify_email(request: Request, payload: VerifyEmailRequest, db: Session = Depends(get_db)):
-    token_hash = _hash_reset_token(payload.token)
-    user = db.query(User).filter(User.verification_token_hash == token_hash).first()
-
-    if not user or not user.verification_token_expires_at:
-        raise HTTPException(status_code=400, detail="Invalid or expired verification token")
-
-    expires_at = user.verification_token_expires_at
-    if expires_at.tzinfo is None:
-        expires_at = expires_at.replace(tzinfo=timezone.utc)
-    if expires_at < datetime.now(timezone.utc):
-        raise HTTPException(status_code=400, detail="Invalid or expired verification token")
-
-    user.is_verified = True
-    user.verification_token_hash = None
-    user.verification_token_expires_at = None
-    db.commit()
-
-    _send_welcome_email(user.email, user.full_name)
-
-    return {"message": "Email verified successfully"}
-
-@router.post("/resend-verification")
-@limiter.limit("3/minute")
-def resend_verification(request: Request, payload: ResendVerificationRequest, db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.email == payload.email).first()
-
-    response = {
-        "message": "If an unverified account with this email exists, a new verification link has been sent."
-    }
-
-    if not user or user.is_verified:
-        return response
-
-    raw_token = secrets.token_urlsafe(48)
-    user.verification_token_hash = _hash_reset_token(raw_token)
-    user.verification_token_expires_at = datetime.now(timezone.utc) + timedelta(hours=24)
-    db.commit()
-
-    verify_url = f"{settings.FRONTEND_URL.rstrip('/')}/verify-email?token={raw_token}"
-    _send_verification_email(user.email, user.full_name, verify_url)
-
-    if settings.APP_ENV.lower() in {"development", "dev", "local", "test", "testing"}:
-        response["verify_url"] = verify_url
-
-    return response
 
 @router.get("/me", response_model=UserResponse)
 def read_users_me(current_user: User = Depends(get_current_user)):

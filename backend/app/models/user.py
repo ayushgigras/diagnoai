@@ -26,11 +26,6 @@ class User(Base):
     password_reset_token_hash = Column(String, nullable=True)
     password_reset_token_expires_at = Column(DateTime, nullable=True)
     
-    # Email Verification
-    is_verified = Column(Boolean, default=False, server_default="false")
-    verification_token_hash = Column(String, nullable=True)
-    verification_token_expires_at = Column(DateTime, nullable=True)
-    
     # New Profile Fields
     phone = Column(String, nullable=True)
     bio = Column(String, nullable=True)
