@@ -6,6 +6,7 @@ import AnalysisResults from '../components/xray/AnalysisResults';
 import LabResults from '../components/lab/LabResults';
 import type { ReportPatientDetails } from '../types';
 import { downloadReportPdf } from '../utils/reportPdf';
+import useAuthStore from '../store/useAuthStore';
 
 interface Report extends ReportPatientDetails {
     id: number;
@@ -26,6 +27,7 @@ const statusConfig: Record<string, { icon: any; color: string; label: string }> 
 };
 
 const History = () => {
+    const { user } = useAuthStore();
     const [reports, setReports] = useState<Report[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -93,11 +95,25 @@ const History = () => {
     };
 
     const getPatientName = (report: Report) => {
-        if (report.patient_name) return report.patient_name;
-        const first = report.patient_first_name || '';
-        const last = report.patient_last_name || '';
-        const full = `${first} ${last}`.trim();
-        return full || `Patient ID: ${report.patient_id}`;
+        const candidates = [
+            report.patient_name,
+            report.patient_first_name && report.patient_last_name
+                ? `${report.patient_first_name} ${report.patient_last_name}`.trim()
+                : null,
+            report.patient_first_name || report.patient_last_name
+                ? `${report.patient_first_name || ''} ${report.patient_last_name || ''}`.trim()
+                : null,
+        ];
+        const stored = candidates.find(
+            (v) => v && v.trim() && v.toLowerCase() !== 'unknown patient'
+        );
+        if (stored) return stored;
+        
+        if (user && user.role === 'patient') {
+            return user.full_name;
+        }
+        
+        return `Patient ID: ${report.patient_id}`;
     };
 
     const downloadReport = (report: Report) => {

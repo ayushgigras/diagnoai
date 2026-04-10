@@ -2,8 +2,15 @@ import os
 import re
 import json
 import base64
+import io
+import pytesseract
+import pdf2image
+import google.api_core.exceptions
+from PIL import Image
 import google.generativeai as genai
 from dotenv import load_dotenv
+
+load_dotenv()
 
 def determine_mime_type(file_name: str) -> str:
     ext = file_name.lower().split('.')[-1]
@@ -26,7 +33,6 @@ async def extract_lab_values_from_file(file: bytes, file_name: str):
     Extracts structured lab parameters, values, units, and reference ranges directly from an image/PDF using Gemini Vision.
     """
     try:
-        load_dotenv()
         api_key = os.getenv("GEMINI_API_KEY")
         if not api_key:
             return {
@@ -37,7 +43,7 @@ async def extract_lab_values_from_file(file: bytes, file_name: str):
             }
             
         genai.configure(api_key=api_key)
-        model = genai.GenerativeModel("gemini-2.5-flash")
+        model = genai.GenerativeModel("gemini-1.5-flash")
         
         mime_type = determine_mime_type(file_name)
         
@@ -115,14 +121,66 @@ async def extract_lab_values_from_file(file: bytes, file_name: str):
             "status": "success"
         }
 
-    except Exception as e:
+    except json.JSONDecodeError as e:
         import traceback
         traceback.print_exc()
-        print(f"Gemini Vision OCR Error: {e}")
+        print(f"Gemini Vision Output JSON Error: {e}")
         return {
             "extracted_data": [],
             "confidence": 0.0,
-            "ocr_text": f"Error parsing image with Gemini: {str(e)}",
+            "ocr_text": f"Error parsing JSON from Gemini: {str(e)}",
+            "status": "error"
+        }
+    except google.api_core.exceptions.GoogleAPIError as e:
+        import traceback
+        traceback.print_exc()
+        print(f"Gemini Vision API Error: {e}, falling back to Tesseract.")
+        
+        try:
+            mime_type = determine_mime_type(file_name)
+            extracted_text = ""
+            
+            if mime_type == 'application/pdf':
+                # Generate images from PDF using pdf2image
+                images = pdf2image.convert_from_bytes(file)
+                for img in images:
+                    extracted_text += pytesseract.image_to_string(img) + "\n"
+            else:
+                # For image fallback
+                img = Image.open(io.BytesIO(file))
+                extracted_text = pytesseract.image_to_string(img)
+            
+            # Use the local regex parser
+            parsed_dict = parse_lab_text(extracted_text)
+            
+            # Convert dictionary format to the structured List[Dict] format expected by frontend
+            structured_data = [
+                {"parameter_name": k.upper(), "result_value": v, "unit": "", "reference_range": "", "flag": ""}
+                for k, v in parsed_dict.items()
+            ]
+            
+            return {
+                "extracted_data": structured_data,
+                "confidence": 0.6,  # Lower confidence for fallback
+                "ocr_text": "Using Tesseract fallback.",
+                "status": "success"
+            }
+        except Exception as fallback_err:
+            print(f"Tesseract fallback also failed: {fallback_err}")
+            return {
+                "extracted_data": [],
+                "confidence": 0.0,
+                "ocr_text": f"Error parsing image with Gemini: {str(e)}. Fallback failed: {str(fallback_err)}",
+                "status": "error"
+            }
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        print(f"Unexpected Error during OCR: {e}")
+        return {
+            "extracted_data": [],
+            "confidence": 0.0,
+            "ocr_text": f"Unexpected error processing document: {str(e)}",
             "status": "error"
         }
 

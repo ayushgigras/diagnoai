@@ -1,5 +1,9 @@
-from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Body, Depends
+from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Body, Depends, Request
 from sqlalchemy.orm import Session
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+
+limiter = Limiter(key_func=get_remote_address)
 from app.services import lab_service, ocr_service
 from app.utils.upload import validate_and_save_upload
 from app.tasks import process_lab
@@ -13,7 +17,9 @@ from typing import Dict, Any
 router = APIRouter()
 
 @router.post("/analyze-manual")
+@limiter.limit("10/minute")
 async def analyze_manual(
+    request: Request,
     data: Dict[str, Any] = Body(...),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -62,7 +68,9 @@ async def analyze_manual(
     return result
 
 @router.post("/upload-file")
+@limiter.limit("5/minute")
 async def upload_lab_file(
+    request: Request,
     file: UploadFile = File(...),
     current_user: User = Depends(get_current_user)
 ):
@@ -82,7 +90,9 @@ async def upload_lab_file(
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/analyze-from-file")
+@limiter.limit("5/minute")
 async def analyze_from_file(
+    request: Request,
     file: UploadFile = File(...),
     patient_id: int | None = Form(None),
     patient_first_name: str | None = Form(None),

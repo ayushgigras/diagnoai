@@ -1,4 +1,6 @@
-from fastapi import FastAPI, Request, Response
+from contextlib import asynccontextmanager
+import sys
+from fastapi import FastAPI, Request, Response, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
@@ -9,7 +11,7 @@ import os
 import secrets
 
 from app.config import settings
-from app.routers import xray, lab, auth, tasks, reports, ws, admin, feedback
+from app.routers import xray, lab, auth, tasks, reports, ws, admin, feedback, chatbot
 
 # --------------- Rate Limiter ---------------
 ratelimit_enabled = os.getenv("RATELIMIT_ENABLED", "true").lower() != "false"
@@ -19,11 +21,36 @@ limiter = Limiter(
     enabled=ratelimit_enabled
 )
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    from app.services.xray_service import get_model
+    try:
+        get_model()  # Load DenseNet ONCE at startup
+    except Exception as e:
+        print(f"CRITICAL ERROR: Failed to load DenseNet model: {e}")
+        sys.exit(1) # Hard crash on model load failure
+    yield
+
+sentry_dsn = os.getenv("SENTRY_DSN")
+if sentry_dsn:
+    import sentry_sdk
+    sentry_sdk.init(
+        dsn=sentry_dsn,
+        traces_sample_rate=1.0,
+    )
+
 app = FastAPI(
     title=settings.PROJECT_NAME,
     description="AI-powered diagnostic system for medical imaging and laboratory reports",
     version=settings.PROJECT_VERSION,
+    lifespan=lifespan
 )
+
+try:
+    from prometheus_fastapi_instrumentator import Instrumentator
+    Instrumentator().instrument(app).expose(app, endpoint="/api/metrics")
+except ImportError:
+    print("prometheus_fastapi_instrumentator not installed, skipping metrics endpoint.")
 
 if settings.APP_ENV == "production" and "*" in settings.BACKEND_CORS_ORIGINS:
     raise RuntimeError("CORS cannot allow wildcard '*' in production.")
@@ -101,6 +128,7 @@ app.include_router(reports.router, prefix="/api/reports", tags=["Reports"])
 app.include_router(ws.router, prefix="/api", tags=["WebSockets"])
 app.include_router(admin.router, prefix="/api/admin", tags=["Admin"])
 app.include_router(feedback.router, prefix="/api", tags=["Feedback"])
+app.include_router(chatbot.router, prefix="/api/chatbot", tags=["Chatbot"])
 
 # --------------- Static Files ---------------
 UPLOAD_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "uploads")
@@ -108,11 +136,49 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 
 
+from sqlalchemy import text
+from app.database import get_db
+from sqlalchemy.orm import Session
+import redis.asyncio as aioredis
+
 @app.get("/api/health")
 @limiter.limit("10/minute")
-async def health_check(request: Request):
-    return {"status": "healthy", "project": settings.PROJECT_NAME}
+async def health_check(request: Request, db: Session = Depends(get_db)):
+    health_status = {
+        "status": "healthy",
+        "project": settings.PROJECT_NAME,
+        "database": "unknown",
+        "redis": "unknown",
+        "model": "unknown"
+    }
+    
+    # Check Database
+    try:
+        db.execute(text("SELECT 1"))
+        health_status["database"] = "connected"
+    except Exception as e:
+        health_status["database"] = "failed"
+        health_status["status"] = "unhealthy"
 
+    # Check Redis
+    try:
+        redis_client = aioredis.from_url(settings.CELERY_BROKER_URL)
+        await redis_client.ping()
+        health_status["redis"] = "connected"
+        await redis_client.close()
+    except Exception as e:
+        health_status["redis"] = "failed"
+        health_status["status"] = "unhealthy"
+
+    # Check Model
+    from app.services.xray_service import _MODEL
+    if _MODEL is not None:
+        health_status["model"] = "loaded"
+    else:
+        health_status["model"] = "not_loaded"
+        health_status["status"] = "unhealthy"
+
+    return health_status
 
 @app.get("/")
 async def root():

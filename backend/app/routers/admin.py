@@ -99,6 +99,8 @@ def get_all_reports(
     for report in reports:
         if report.doctor:
             report.doctor_name = report.doctor.full_name
+            if report.doctor.role == "patient" and report.doctor.full_name:
+                report.user_full_name = report.doctor.full_name
         if report.patient:
             report.patient_name = f"{report.patient.first_name} {report.patient.last_name}"
             report.patient_first_name = report.patient.first_name

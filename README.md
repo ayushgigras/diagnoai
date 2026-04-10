@@ -15,6 +15,7 @@ DiagnoAI is a full-stack AI-powered diagnostic system designed to assist healthc
 
 - **🔬 X-Ray Analysis**: Automated detection of conditions like Pneumonia, COVID-19, and Fractures from X-ray images using deep learning (TorchXRayVision), processing synchronously for immediate results.
 - **🧪 Lab Report Analysis**: Intelligent parsing of PDF/Image lab reports using OCR (Google Gemini Vision), with automatic interpretation of values against reference ranges and clinical flags (H/L/*).
+- **🤖 Context-Aware Medical Chatbot**: A global AI assistant that understands the medical report currently on your screen and answers your health queries in plain English.
 - **📝 Intelligent Insights**: Confidence scores, probability distributions, and plain-English clinical recommendations.
 - **🔒 Secure by Design**: JWT authentication, CSRF protection, bcrypt password hashing, rate limiting, security headers, input validation, and role-based access control (RBAC).
 - **🔑 Modern Auth Options**: Email/password login, Google sign-in, forgot-password flow, and token-based password reset.
@@ -26,23 +27,48 @@ DiagnoAI is a full-stack AI-powered diagnostic system designed to assist healthc
 
 ## Architecture
 
-```
-┌─────────────┐       ┌──────────────┐       ┌──────────┐
-│  React SPA  │──────►│  FastAPI      │──────►│PostgreSQL│
-│  (Vite+TS)  │  JWT  │  REST API     │  ORM  │          │
-└──────┬──────┘       └──────┬──┬────┘       └──────────┘
-       │        WebSocket    │  │
-       └─────────────────────┘  │
-                                │
-                        ┌───────▼───────┐       ┌──────────┐
-                        │  Celery       │──────►│  Redis   │
-                        │  Workers      │       │  Broker  │
-                        └───────┬───────┘       └──────────┘
-                                │
-                       ┌────────▼─────┐        ┌──────────────┐
-                       │ Google Gemini│        │TorchXRayVision│
-                       │ (Lab OCR/AI) │        │  (X-Ray AI)   │
-                       └──────────────┘        └──────────────┘
+## Architecture
+
+```mermaid
+graph TD
+    %% Define Styles
+    classDef react fill:#00d8ff,stroke:#000,stroke-width:2px,color:#000
+    classDef fastapi fill:#059487,stroke:#000,stroke-width:2px,color:#fff
+    classDef db fill:#336791,stroke:#000,stroke-width:2px,color:#fff
+    classDef redis fill:#d82c20,stroke:#000,stroke-width:2px,color:#fff
+    classDef ai fill:#fbbc05,stroke:#000,stroke-width:2px,color:#000
+
+    subgraph Client Tier ["Client Tier"]
+        UI["React SPA<br/>(Vite, TS)"]:::react
+    end
+
+    subgraph Application Tier ["Application Tier"]
+        API["FastAPI Backend<br/>REST + WebSockets"]:::fastapi
+        Celery["Celery Workers<br/>(Async Tasks)"]:::fastapi
+        
+        API -- "Enqueues Tasks" --> Celery
+    end
+
+    subgraph Data Tier ["Data Tier"]
+        DB[("PostgreSQL")]:::db
+        Broker[("Redis<br/>(Broker/Backend)")]:::redis
+        
+        API -- "SQLAlchemy ORM" --> DB
+        Celery -- "Read/Write" --> DB
+        API -- "Task Comm" --> Broker
+        Celery -- "Fetch Task" --> Broker
+    end
+
+    subgraph AI Tier ["AI Inference engines"]
+        OCR["Google Gemini<br/>(Vision / LLM)"]:::ai
+        Vision["TorchXRayVision<br/>(DenseNet)"]:::ai
+        
+        Celery -- "Extract Lab Data" --> OCR
+        API -- "Sync X-Ray Infer" --> Vision
+    end
+
+    UI -- "JWT / HTTPS" --> API
+    UI -. "WS Messages" .-> API
 ```
 
 | Layer             | Technology                                |
@@ -180,6 +206,18 @@ streamlit run streamlit_app.py
 
 Opens at `http://localhost:8501`. Ensure the backend API server is running on port 8000.
 
+## 🚀 Production Deployment (Docker + Nginx)
+
+For full production, DiagnoAI utilizes `docker-compose.prod.yml` which deploys Nginx as a reverse proxy alongside PostgreSQL, Redis, FastAPI, Celery, and the Vite SPA built assets.
+
+1. Ensure `nginx/nginx.conf` and `docker-compose.prod.yml` are present.
+2. Edit your `.env` properly with `APP_ENV=production` and strong secrets.
+3. Build and deploy:
+```bash
+docker compose -f docker-compose.prod.yml up -d --build
+```
+Your application will be served exclusively over port 80 (or 443 with SSL certs) with static files directly cached by Nginx.
+
 ## API Endpoints
 
 | Method | Endpoint                  | Auth | Description                          |
@@ -306,6 +344,7 @@ Tests cover:
 - **📊 X-Ray Analysis Dashboard**: SVG confidence ring, 4-stat summary row (Prediction, Confidence, Findings, Severity), auto-expanded XAI explainability cards with numbered steps, full probability distribution with highlighted primary prediction, and Grad-CAM heatmap visualization.
 - **🧪 Lab Analysis Dashboard**: Assessment banner with AI interpretation callout, 4-stat dashboard (Total, Normal, Abnormal, Critical), individual parameter cards with 3-zone gauge bars (Low/Normal/High), direction arrows, and numbered recommendation cards.
 - **📥 PDF Report Generation**: Downloadable diagnostic reports using jsPDF with auto-table formatting, severity-colored badges, structured findings tables, and XAI explainability sections. Supports both X-Ray and Lab report formats.
+- **💬 Medical Chatbot Widget**: Floating UI element powered by Framer Motion, enabling on-demand, context-aware conversations about active reports with smooth animations and professional aesthetics.
 
 ## AI Capabilities
 
@@ -322,6 +361,11 @@ We welcome contributions! Please read [CONTRIBUTING.md](./CONTRIBUTING.md) befor
 - Follow existing code style
 
 ## Changelog
+
+### v1.2.0 (April 2026)
+- ✅ Added DiagnoAI Medical Assistant — a global, context-aware chatbot widget for answering user queries about their medical reports.
+- ✅ Integrated Gemini 2.5 Flash for rapid chatbot responses with strict medical-only constraints.
+- ✅ Added `useChatStore` state management for dynamic context injection.
 
 ### v1.1.0 (March 2026)
 - ✅ Added AI feedback system — users can rate analysis accuracy

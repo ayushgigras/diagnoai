@@ -74,6 +74,8 @@ api.interceptors.response.use(
             fireToast(friendlyMessage, status && status >= 500 ? 'error' : 'warning');
         }
 
+        console.error(`[API Error] ${error.config?.method?.toUpperCase()} ${error.config?.url} failed with status ${status}:`, error);
+
         return Promise.reject(error);
     }
 );

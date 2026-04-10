@@ -12,6 +12,7 @@ import base64
 import numpy as np
 import torch
 import torch.nn.functional as F
+import asyncio
 import skimage.io
 import skimage.transform
 import matplotlib
@@ -32,6 +33,7 @@ except ImportError:
 # ─── Model Cache ────────────────────────────────────────────────────────────────
 _MODEL = None
 _DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+_INFERENCE_SEMAPHORE = asyncio.Semaphore(2)
 
 # ─── XAI Knowledge Base ─────────────────────────────────────────────────────────
 # Per-condition: radiological finding description, visual pattern, clinical context
@@ -444,13 +446,14 @@ async def predict_xray(image_bytes: bytes, xray_type: str) -> dict:
     model = get_model()
     gradcam = get_gradcam()
 
-    # ── 2. Preprocess ──
-    tensor, orig_pil = preprocess_for_xrv(image_bytes)
-
-    # ── 3. Inference ──
-    with torch.no_grad():
-        raw_output = model(tensor)  # [1, 18]
-        scores = raw_output[0].cpu().numpy()  # [18] ← CHANGED
+    async with _INFERENCE_SEMAPHORE:
+        # ── 2. Preprocess ──
+        tensor, orig_pil = preprocess_for_xrv(image_bytes)
+        
+        # ── 3. Inference ──
+        with torch.no_grad():
+            raw_output = model(tensor)  # [1, 18]
+            scores = raw_output[0].cpu().numpy()  # [18] ← CHANGED
 
     pathologies = model.pathologies
     prob_dict = {p: float(s) for p, s in zip(pathologies, scores)}

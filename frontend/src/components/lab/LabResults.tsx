@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import type { LabResult, LabParameter } from '../../types';
 import { Card, CardHeader, CardTitle, CardContent } from '../common/Card';
 import {
@@ -7,6 +8,8 @@ import {
 import { cn } from '../../lib/utils';
 import FeedbackForm from '../common/FeedbackForm';
 import { calculateParameterStatus } from '../../utils/labUtils';
+import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip as RechartsTooltip } from 'recharts';
+import useChatStore from '../../store/useChatStore';
 
 interface LabResultsProps {
     result: LabResult;
@@ -124,6 +127,24 @@ const ParameterCard = ({ param }: { param: LabParameter }) => {
 
 /* ─── Main Component ──────────────────────────────────────────────────── */
 const LabResults = ({ result }: LabResultsProps) => {
+    const { setContext } = useChatStore();
+
+    useEffect(() => {
+        // Construct a nicely formatted string for the AI so it perfectly understands the numbers
+        const contextStr = [
+            `Current Lab Report Assessment: ${result.assessment} (${(result.confidence * 100).toFixed(1)}% confidence)`,
+            `AI Interpretation:\n${result.interpretation}`,
+            `\nDetailed Parameter Numbers:`,
+            ...result.parameters.map(p => `- ${p.name}: ${p.value} ${p.unit} (Ref: ${p.reference_range}) | Flag: ${p.flag || 'None'}`)
+        ].join('\n');
+        
+        setContext(contextStr);
+
+        return () => {
+            setContext(null); // Clear context when component unmounts
+        };
+    }, [result, setContext]);
+
     const normalCount = result.parameters.filter(p => calculateParameterStatus(p) === 'normal').length;
     const abnormalCount = result.parameters.filter(p => {
         const s = calculateParameterStatus(p);
@@ -195,19 +216,57 @@ const LabResults = ({ result }: LabResultsProps) => {
             </div>
 
             {/* ── Stats Dashboard ─────────────────────────────────────── */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                {[
-                    { label: 'Total Parameters', value: totalCount, icon: Activity, iconColor: 'text-primary', bg: 'bg-primary/5' },
-                    { label: 'Normal', value: normalCount, icon: CheckCircle2, iconColor: 'text-emerald-500', bg: 'bg-emerald-500/5' },
-                    { label: 'Abnormal', value: abnormalCount, icon: AlertCircle, iconColor: 'text-amber-500', bg: 'bg-amber-500/5' },
-                    { label: 'Critical', value: criticalCount, icon: AlertTriangle, iconColor: 'text-red-500', bg: 'bg-red-500/5' },
-                ].map(({ label, value, icon: Icon, iconColor, bg }) => (
-                    <div key={label} className={`rounded-xl border border-slate-200 dark:border-slate-800 p-4 text-center ${bg} shadow-sm`}>
-                        <Icon className={`w-6 h-6 ${iconColor} mx-auto mb-2`} />
-                        <div className="text-3xl font-black text-slate-900 dark:text-white">{value}</div>
-                        <div className="text-[11px] text-slate-400 uppercase tracking-wider font-bold mt-1">{label}</div>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className="lg:col-span-2 grid grid-cols-2 gap-4">
+                    {[
+                        { label: 'Total Parameters', value: totalCount, icon: Activity, iconColor: 'text-primary', bg: 'bg-primary/5' },
+                        { label: 'Normal', value: normalCount, icon: CheckCircle2, iconColor: 'text-emerald-500', bg: 'bg-emerald-500/5' },
+                        { label: 'Abnormal', value: abnormalCount, icon: AlertCircle, iconColor: 'text-amber-500', bg: 'bg-amber-500/5' },
+                        { label: 'Critical', value: criticalCount, icon: AlertTriangle, iconColor: 'text-red-500', bg: 'bg-red-500/5' },
+                    ].map(({ label, value, icon: Icon, iconColor, bg }) => (
+                        <div key={label} className={`rounded-xl border border-slate-200 dark:border-slate-800 p-4 text-center ${bg} shadow-sm flex flex-col justify-center items-center h-full`}>
+                            <Icon className={`w-6 h-6 ${iconColor} mx-auto mb-2`} />
+                            <div className="text-3xl font-black text-slate-900 dark:text-white">{value}</div>
+                            <div className="text-[11px] text-slate-400 uppercase tracking-wider font-bold mt-1">{label}</div>
+                        </div>
+                    ))}
+                </div>
+                <div className="rounded-xl border border-slate-200 dark:border-slate-800 p-4 shadow-sm bg-white dark:bg-slate-900 flex flex-col">
+                    <h3 className="text-sm font-bold text-slate-900 dark:text-white mb-2 uppercase tracking-wide text-center">Parameter Distribution</h3>
+                    <div className="flex-1 min-h-[180px]">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <PieChart>
+                                <Pie
+                                    data={[
+                                        { name: 'Normal', value: normalCount, color: '#10b981' },
+                                        { name: 'Abnormal', value: abnormalCount, color: '#f59e0b' },
+                                        { name: 'Critical', value: criticalCount, color: '#ef4444' }
+                                    ].filter(d => d.value > 0)}
+                                    cx="50%"
+                                    cy="50%"
+                                    innerRadius={50}
+                                    outerRadius={75}
+                                    paddingAngle={3}
+                                    dataKey="value"
+                                    stroke="none"
+                                >
+                                    {[
+                                        { name: 'Normal', value: normalCount, color: '#10b981' },
+                                        { name: 'Abnormal', value: abnormalCount, color: '#f59e0b' },
+                                        { name: 'Critical', value: criticalCount, color: '#ef4444' }
+                                    ].filter(d => d.value > 0).map((entry, index) => (
+                                        <Cell key={`cell-${index}`} fill={entry.color} />
+                                    ))}
+                                </Pie>
+                                <RechartsTooltip 
+                                    contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                                    itemStyle={{ fontWeight: 'bold' }}
+                                />
+                                <Legend verticalAlign="bottom" height={36} iconType="circle" wrapperStyle={{ fontSize: '12px', fontWeight: 'bold' }} />
+                            </PieChart>
+                        </ResponsiveContainer>
                     </div>
-                ))}
+                </div>
             </div>
 
             {/* ── Detailed Parameter Analysis ──────────────────────────── */}

@@ -1,5 +1,9 @@
-from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Depends
+from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Depends, Request
 from sqlalchemy.orm import Session
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+
+limiter = Limiter(key_func=get_remote_address)
 from app.services import xray_service
 from app.utils.upload import validate_and_save_upload
 from app.database import get_db
@@ -11,7 +15,9 @@ from app.utils.patient import resolve_or_create_patient_id
 router = APIRouter()
 
 @router.post("/analyze")
+@limiter.limit("5/minute")
 async def analyze_xray(
+    request: Request,
     file: UploadFile = File(...),
     xray_type: str = Form(...),
     patient_id: int | None = Form(None),

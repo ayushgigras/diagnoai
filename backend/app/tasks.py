@@ -7,6 +7,7 @@ from .models.report import Report
 import redis
 import json
 from .config import settings
+from loguru import logger
 
 def notify_user(doctor_id: int, message_type: str, report_id: int, status: str, details: str = ""):
     try:
@@ -18,8 +19,9 @@ def notify_user(doctor_id: int, message_type: str, report_id: int, status: str, 
             "details": details
         }
         r.publish(f"notifications:{doctor_id}", json.dumps(payload))
+        logger.info(f"Published notification to {doctor_id}: {message_type} -> {status}")
     except Exception as e:
-        print(f"Failed to publish notification: {e}")
+        logger.error(f"Failed to publish notification: {e}")
 
 # Helper to run async functions from synchronous celery tasks
 def run_async(coro):
@@ -34,7 +36,7 @@ def run_async(coro):
     finally:
         loop.close()
 
-@celery_app.task(bind=True, name="app.tasks.process_xray")
+@celery_app.task(bind=True, name="app.tasks.process_xray", autoretry_for=(Exception,), max_retries=3, default_retry_delay=5)
 def process_xray(self, file_path: str, xray_type: str, report_id: int):
     """Background task to run DenseNet121 inference on X-Rays."""
     db = SessionLocal()
@@ -50,6 +52,8 @@ def process_xray(self, file_path: str, xray_type: str, report_id: int):
         with open(file_path, "rb") as f:
             contents = f.read()
 
+        notify_user(report.doctor_id, "xray_analysis", report.id, "processing", "Running dense neural inference...")
+
         # Execute heavy AI inference
         result = run_async(xray_service.predict_xray(contents, xray_type))
 
@@ -59,9 +63,11 @@ def process_xray(self, file_path: str, xray_type: str, report_id: int):
         db.commit()
 
         notify_user(report.doctor_id, "xray_analysis", report.id, "completed", "X-Ray analysis is ready.")
+        logger.info(f"Completed process_xray for report {report_id}")
 
         return result
     except Exception as e:
+        logger.error(f"process_xray failed for report {report_id}: {str(e)}")
         report = db.query(Report).filter(Report.id == report_id).first()
         if report:
             report.status = "failed"
@@ -72,21 +78,25 @@ def process_xray(self, file_path: str, xray_type: str, report_id: int):
     finally:
         db.close()
 
-@celery_app.task(bind=True, name="app.tasks.process_lab")
+@celery_app.task(bind=True, name="app.tasks.process_lab", autoretry_for=(Exception,), max_retries=3, default_retry_delay=5)
 def process_lab(self, file_path: str, filename: str, report_id: int):
     """Background task to run Gemini Multimodal OCR and clinical analysis on labs."""
     db = SessionLocal()
     try:
         report = db.query(Report).filter(Report.id == report_id).first()
         if not report:
+            logger.warning(f"Report {report_id} not found for process_lab")
             return {"error": "Report not found"}
             
         report.status = "processing"
         db.commit()
+        logger.info(f"Started processing lab task for report {report_id}")
 
         # Read the securely saved file
         with open(file_path, "rb") as f:
             contents = f.read()
+
+        notify_user(report.doctor_id, "lab_analysis", report.id, "processing", "Extracting text and running semantic OCR...")
 
         # Execute OCR and Analysis
         ocr_result = run_async(ocr_service.extract_lab_values_from_file(contents, filename))
@@ -105,9 +115,11 @@ def process_lab(self, file_path: str, filename: str, report_id: int):
         db.commit()
 
         notify_user(report.doctor_id, "lab_analysis", report.id, "completed", "Lab report analysis is ready.")
+        logger.info(f"Completed process_lab for report {report_id}")
 
         return analysis
     except Exception as e:
+        logger.error(f"process_lab failed for report {report_id}: {str(e)}")
         report = db.query(Report).filter(Report.id == report_id).first()
         if report:
             report.status = "failed"

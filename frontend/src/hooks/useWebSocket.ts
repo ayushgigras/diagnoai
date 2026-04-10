@@ -57,7 +57,14 @@ const useWebSocket = (clientId: string) => {
     useEffect(() => {
         connect();
 
+        const pingInterval = setInterval(() => {
+            if (wsRef.current?.readyState === WebSocket.OPEN) {
+                wsRef.current.send("ping");
+            }
+        }, 15000); // 15 seconds keep-alive
+
         return () => {
+            clearInterval(pingInterval);
             if (reconnectTimeoutRef.current) {
                 clearTimeout(reconnectTimeoutRef.current);
             }

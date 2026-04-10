@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type { XRayResult, XAIDetail } from '../../types';
 import { Card, CardHeader, CardTitle, CardContent } from '../common/Card';
 import {
@@ -7,6 +7,8 @@ import {
     Info, AlertTriangle, CheckCircle2, Zap, Shield, Target, TrendingUp
 } from 'lucide-react';
 import FeedbackForm from '../common/FeedbackForm';
+import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, Tooltip as RechartsTooltip } from 'recharts';
+import useChatStore from '../../store/useChatStore';
 
 interface AnalysisResultsProps {
     result: XRayResult;
@@ -143,6 +145,27 @@ function XAICard({ condition, detail, defaultOpen = false }: {
 
 /* ─── Main Component ──────────────────────────────────────────────────── */
 const AnalysisResults = ({ result, imagePreview }: AnalysisResultsProps) => {
+    const { setContext } = useChatStore();
+
+    useEffect(() => {
+        const xaiStr = result.xai_details ? Object.entries(result.xai_details).map(([k, v]) => 
+            `- ${k} (${v.confidence_pct}% conf): ${v.radiological_finding} / Rec: ${v.recommendation}`
+        ).join('\n') : "No detailed XAI found.";
+
+        const contextStr = [
+            `Current X-Ray Report Prediction: ${result.prediction} (${(result.confidence * 100).toFixed(1)}% confidence, region: ${result.region || "unspecified"})`,
+            `Detected Findings:`,
+            ...(result.findings || []).map(f => `- ${f.condition} (${(f.score * 100).toFixed(1)}%)`),
+            `\nExplainability Details:`,
+            xaiStr
+        ].join('\n');
+        
+        setContext(contextStr);
+
+        return () => {
+            setContext(null); // Clear context when component unmounts
+        };
+    }, [result, setContext]);
     const heatmapSrc = (result.heatmap_b64 || result.heatmap_base64)
         ? `data:image/png;base64,${result.heatmap_b64 || result.heatmap_base64}`
         : null;
@@ -369,7 +392,7 @@ const AnalysisResults = ({ result, imagePreview }: AnalysisResultsProps) => {
                         Confidence scores for all {sortedProbs.length} pathologies analyzed
                     </p>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="grid lg:grid-cols-2 gap-6 items-center">
                     <div className="space-y-1">
                         {sortedProbs.map(([condition, prob], idx) => {
                             const pct = prob * 100;
@@ -396,6 +419,30 @@ const AnalysisResults = ({ result, imagePreview }: AnalysisResultsProps) => {
                                 </div>
                             );
                         })}
+                    </div>
+                    
+                    {/* Radar Chart Visualization */}
+                    <div className="hidden lg:flex w-full h-[350px] justify-center items-center rounded-xl bg-slate-50 dark:bg-slate-900/30 border border-slate-100 dark:border-slate-800 p-4">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <RadarChart cx="50%" cy="50%" outerRadius="70%" data={sortedProbs.slice(0, 8).map(([name, val]) => ({ name: name.length > 12 ? name.substring(0, 10) + '...' : name, fullDataName: name, value: Math.round(val * 100) }))}>
+                                <PolarGrid stroke="#e2e8f0" />
+                                <PolarAngleAxis dataKey="name" tick={{ fill: '#64748b', fontSize: 11, fontWeight: 'bold' }} />
+                                <PolarRadiusAxis angle={30} domain={[0, 100]} tick={{ fill: '#94a3b8', fontSize: 10 }} />
+                                <Radar 
+                                    name="Confidence %" 
+                                    dataKey="value" 
+                                    stroke={cfg.hex} 
+                                    fill={cfg.hex} 
+                                    fillOpacity={0.4} 
+                                    isAnimationActive={true}
+                                />
+                                <RechartsTooltip 
+                                    contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                                    formatter={(value: number) => [`${value}%`, 'Confidence']}
+                                    labelFormatter={(label, payload) => payload?.[0]?.payload?.fullDataName || label}
+                                />
+                            </RadarChart>
+                        </ResponsiveContainer>
                     </div>
                 </CardContent>
             </Card>

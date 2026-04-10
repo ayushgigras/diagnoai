@@ -15,8 +15,9 @@ import Profile from './pages/Profile';
 import AdminDashboard from './pages/AdminDashboard';
 import ProtectedRoute from './components/common/ProtectedRoute';
 import NotificationsHelper from './components/common/NotificationsHelper';
-import ErrorBoundary from './components/common/ErrorBoundary';
+import { ErrorBoundary } from './components/common/ErrorBoundary';
 import ToastContainer from './components/common/ToastContainer';
+import { ChatbotWidget } from './components/common/ChatbotWidget';
 import api from './services/api';
 
 function App() {
@@ -65,6 +66,7 @@ function App() {
           </main>
           <NotificationsHelper />
           <ToastContainer />
+          <ChatbotWidget />
           <Footer />
         </div>
       </Router>
