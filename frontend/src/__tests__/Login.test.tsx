@@ -42,7 +42,8 @@ describe('Login Page', () => {
         expect(screen.getByPlaceholderText(/doctor@diagnoai/i)).toBeInTheDocument();
         expect(screen.getByPlaceholderText(/\*\*\*\*\*\*\*\*/i)).toBeInTheDocument();
         
-        const submitButton = screen.getByRole('button', { name: /sign in/i });
+        // Use the submit button specifically (there's also a Google SSO button)
+        const submitButton = screen.getByRole('button', { name: /^sign in$/i });
         expect(submitButton).toBeInTheDocument();
     });
 
@@ -56,7 +57,7 @@ describe('Login Page', () => {
         
         fireEvent.change(screen.getByPlaceholderText(/doctor@diagnoai/i), { target: { value: 'test@example.com' } });
         fireEvent.change(screen.getByPlaceholderText(/\*\*\*\*\*\*\*\*/i), { target: { value: 'wrongpass' } });
-        fireEvent.click(screen.getByRole('button', { name: /sign in/i }));
+        fireEvent.click(screen.getByRole('button', { name: /^sign in$/i }));
 
         await waitFor(() => {
             expect(screen.getByText(/incorrect credentials/i)).toBeInTheDocument();
@@ -78,7 +79,7 @@ describe('Login Page', () => {
         
         fireEvent.change(screen.getByPlaceholderText(/doctor@diagnoai/i), { target: { value: 'test@example.com' } });
         fireEvent.change(screen.getByPlaceholderText(/\*\*\*\*\*\*\*\*/i), { target: { value: 'password123' } });
-        fireEvent.click(screen.getByRole('button', { name: /sign in/i }));
+        fireEvent.click(screen.getByRole('button', { name: /^sign in$/i }));
 
         await waitFor(() => {
             expect(mockLogin).toHaveBeenCalledWith('fake-jwt-token', mockResponse.data.user);

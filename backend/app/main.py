@@ -27,8 +27,9 @@ async def lifespan(app: FastAPI):
     try:
         get_model()  # Load DenseNet ONCE at startup
     except Exception as e:
-        print(f"CRITICAL ERROR: Failed to load DenseNet model: {e}")
-        sys.exit(1) # Hard crash on model load failure
+        import logging
+        logging.error(f"CRITICAL ERROR: Failed to load DenseNet model: {e}")
+        # Graceful degradation instead of sys.exit(1)
     yield
 
 sentry_dsn = os.getenv("SENTRY_DSN")

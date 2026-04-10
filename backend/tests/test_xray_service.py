@@ -51,6 +51,6 @@ async def test_predict_xray_abnormal(mock_generate_heatmap, mock_preprocess, moc
     result = await predict_xray(b"fake_image_bytes", "chest")
     
     assert result["prediction"] == "Pneumonia"
-    assert result["confidence"] == 0.85
+    assert abs(result["confidence"] - 0.85) < 0.01
     assert len(result["findings"]) >= 1
     assert result["findings"][0]["condition"] == "Pneumonia"

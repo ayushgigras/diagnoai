@@ -24,5 +24,12 @@ COPY . .
 ENV PYTHONPATH=/app
 ENV APP_ENV=production
 
+# Create a non-root user and switch to it
+RUN adduser --disabled-password --gecos '' appuser && \
+    mkdir -p /app/uploads && \
+    chown -R appuser:appuser /app
+
+USER appuser
+
 # Run FastAPI app with gunicorn
 CMD ["gunicorn", "app.main:app", "-w", "4", "-k", "uvicorn.workers.UvicornWorker", "--bind", "0.0.0.0:8000"]

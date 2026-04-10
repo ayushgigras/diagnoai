@@ -329,7 +329,7 @@ Before going live, verify:
 |---|---|---|
 | `JWT_SECRET_KEY` | Yes | Random 32+ hex string for JWT signing |
 | `ADMIN_REGISTRATION_KEY` | Yes | Secret to unlock admin registration |
-| `DATABASE_URL` | Yes | `postgresql://user:pass@host:5432/db` |
+| `DATABASE_URL` | Yes | Valid PostgreSQL connection string |
 | `CELERY_BROKER_URL` | Yes | Redis URL for task queue |
 | `CELERY_RESULT_BACKEND` | Yes | Redis URL for results |
 | `GEMINI_API_KEY` | Yes | Google Gemini API for lab OCR |

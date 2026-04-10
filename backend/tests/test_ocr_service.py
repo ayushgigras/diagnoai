@@ -40,8 +40,9 @@ async def test_extract_lab_values_gemini_success(mock_model_class):
 @patch("app.services.ocr_service.genai.configure")
 @patch("app.services.ocr_service.pytesseract.image_to_string")
 async def test_extract_lab_values_fallback(mock_tesseract, mock_genai_configure):
+    import google.api_core.exceptions
     # Trigger exception in Gemini config or generation
-    mock_genai_configure.side_effect = Exception("API limit reached")
+    mock_genai_configure.side_effect = google.api_core.exceptions.GoogleAPIError("API limit reached")
     
     # Mock tesseract fallback
     mock_tesseract.return_value = "WBC 8.2\nGlucose 90"

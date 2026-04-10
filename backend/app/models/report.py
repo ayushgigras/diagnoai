@@ -7,8 +7,8 @@ class Report(Base):
     __tablename__ = "reports"
 
     id = Column(Integer, primary_key=True, index=True)
-    patient_id = Column(Integer, ForeignKey("patients.id"))
-    doctor_id = Column(Integer, ForeignKey("users.id"))
+    patient_id = Column(Integer, ForeignKey("patients.id"), index=True)
+    doctor_id = Column(Integer, ForeignKey("users.id"), index=True)
     report_type = Column(String, nullable=False) # "xray" or "lab"
     file_path = Column(String) # Path to uploaded file
     status = Column(String, default="pending") # pending, processing, completed, failed

@@ -13,6 +13,8 @@ from app.models.user import User
 from app.dependencies import get_current_user
 from app.utils.patient import resolve_or_create_patient_id
 from typing import Dict, Any
+from fastapi.concurrency import run_in_threadpool
+import aiofiles
 
 router = APIRouter()
 
@@ -50,20 +52,23 @@ async def analyze_manual(
         )
     
     # Save report to database for history
-    resolved_patient_id = resolve_or_create_patient_id(
-        db,
-        patient_id=patient_id,
-        patient_details=patient_payload if has_patient_names else None,
-    )
-    new_report = Report(
-        patient_id=resolved_patient_id,
-        doctor_id=current_user.id,
-        report_type="lab",
-        status="completed",
-        result_data=result
-    )
-    db.add(new_report)
-    db.commit()
+    def _save_report():
+        resolved_patient_id = resolve_or_create_patient_id(
+            db,
+            patient_id=patient_id,
+            patient_details=patient_payload if has_patient_names else None,
+        )
+        new_report = Report(
+            patient_id=resolved_patient_id,
+            doctor_id=current_user.id,
+            report_type="lab",
+            status="completed",
+            result_data=result
+        )
+        db.add(new_report)
+        db.commit()
+    
+    await run_in_threadpool(_save_report)
     
     return result
 
@@ -76,11 +81,11 @@ async def upload_lab_file(
 ):
     try:
         # 1. Validate and save file securely
-        file_path = validate_and_save_upload(file, is_xray=False)
+        file_path = await run_in_threadpool(validate_and_save_upload, file, False)
         
         # 2. Read the securely saved file
-        with open(file_path, "rb") as f:
-            file_bytes = f.read()
+        async with aiofiles.open(file_path, "rb") as f:
+            file_bytes = await f.read()
             
         result = await ocr_service.extract_lab_values_from_file(file_bytes, file.filename)
         return result
@@ -106,7 +111,7 @@ async def analyze_from_file(
 ):
     try:
         # 1. Validate and save file securely
-        file_path = validate_and_save_upload(file, is_xray=False)
+        file_path = await run_in_threadpool(validate_and_save_upload, file, False)
         
         # 2. Create a pending report in the database
         patient_details = {
@@ -125,27 +130,36 @@ async def analyze_from_file(
                 detail="Doctor must provide patient details before analysis"
             )
 
-        resolved_patient_id = resolve_or_create_patient_id(
-            db,
-            patient_id=patient_id,
-            patient_details=patient_details if has_patient_names else None,
-        )
-        new_report = Report(
-            patient_id=resolved_patient_id,
-            doctor_id=current_user.id,
-            report_type="lab",
-            file_path=file_path,
-        )
-        db.add(new_report)
-        db.commit()
-        db.refresh(new_report)
+        def _create_report():
+            resolved_patient_id = resolve_or_create_patient_id(
+                db,
+                patient_id=patient_id,
+                patient_details=patient_details if has_patient_names else None,
+            )
+            report = Report(
+                patient_id=resolved_patient_id,
+                doctor_id=current_user.id,
+                report_type="lab",
+                file_path=file_path,
+            )
+            db.add(report)
+            db.commit()
+            db.refresh(report)
+            return report
+            
+        new_report = await run_in_threadpool(_create_report)
         
         # 3. Enqueue the Celery task
-        task = process_lab.delay(file_path, file.filename, new_report.id)
+        try:
+            task = process_lab.delay(file_path, file.filename, new_report.id)
+        except Exception:
+            raise HTTPException(status_code=503, detail="Service temporarily unavailable")
         
         # 4. Update the report with the task ID
-        new_report.task_id = task.id
-        db.commit()
+        def _update_task_id():
+            new_report.task_id = task.id
+            db.commit()
+        await run_in_threadpool(_update_task_id)
         
         return {
             "message": "Lab report analysis started in the background",

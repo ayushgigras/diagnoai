@@ -448,12 +448,16 @@ async def predict_xray(image_bytes: bytes, xray_type: str) -> dict:
 
     async with _INFERENCE_SEMAPHORE:
         # ── 2. Preprocess ──
-        tensor, orig_pil = preprocess_for_xrv(image_bytes)
+        def _sync_preprocess():
+            return preprocess_for_xrv(image_bytes)
+        tensor, orig_pil = await asyncio.to_thread(_sync_preprocess)
         
         # ── 3. Inference ──
-        with torch.no_grad():
-            raw_output = model(tensor)  # [1, 18]
-            scores = raw_output[0].cpu().numpy()  # [18] ← CHANGED
+        def _sync_infer():
+            with torch.no_grad():
+                raw_output = model(tensor)  # [1, 18]
+                return raw_output[0].cpu().numpy()  # [18]
+        scores = await asyncio.to_thread(_sync_infer)
 
     pathologies = model.pathologies
     prob_dict = {p: float(s) for p, s in zip(pathologies, scores)}
@@ -520,9 +524,13 @@ async def predict_xray(image_bytes: bytes, xray_type: str) -> dict:
     if not is_normal:
         try:
             primary_idx = list(pathologies).index(primary_pred)
-            tensor_grad = tensor.clone().requires_grad_(True)
-            cam = gradcam.generate(tensor_grad, primary_idx)
-            heatmap_b64, peak_y, peak_x, cam_resized = generate_spectrum_heatmap(cam, orig_pil)
+            def _generate_cam():
+                tensor_grad = tensor.clone().requires_grad_(True)
+                cam = gradcam.generate(tensor_grad, primary_idx)
+                heatmap_b64_val, peak_y_val, peak_x_val, cam_res = generate_spectrum_heatmap(cam, orig_pil)
+                return heatmap_b64_val, peak_y_val, peak_x_val, cam_res, cam
+                
+            heatmap_b64, peak_y, peak_x, cam_resized, cam = await asyncio.to_thread(_generate_cam)
             peak_region = map_to_lung_region(peak_y, peak_x, 224, 224)
         except Exception as e:
             print(f"[DiagnoAI] Grad-CAM failed: {e}")

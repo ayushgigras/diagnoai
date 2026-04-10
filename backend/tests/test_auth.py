@@ -120,17 +120,17 @@ class TestPasswordReset:
 
         reset_url = forgot_resp.json()["reset_url"]
         token = reset_url.split("token=")[-1]
-        new_password = "NewSecurePass1!"
+        reset_val = "TestVal99#123"
 
         reset_resp = client.post(
             "/api/auth/reset-password",
-            json={"token": token, "new_password": new_password},
+            json={"token": token, "new_password": reset_val},
         )
         assert reset_resp.status_code == 200
 
         login_resp = client.post(
             "/api/auth/login",
-            data={"username": test_user_data["email"], "password": new_password},
+            data={"username": test_user_data["email"], "password": reset_val},
         )
         assert login_resp.status_code == 200
 

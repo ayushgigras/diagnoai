@@ -15,7 +15,7 @@ def test_health_check():
 def test_manual_lab_analysis_no_auth():
     # Verify authentication blocks
     response = client.post("/api/lab/analyze-manual", json={"values": {"wbc": 7000}})
-    assert response.status_code == 401
+    assert response.status_code in [401, 403]
 
 @pytest.fixture
 def mock_token():

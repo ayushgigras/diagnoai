@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 from typing import List
 
 from ..database import get_db
@@ -23,6 +23,7 @@ def get_my_reports(
         # Doctors and admins fetch reports they own (created)
         reports = (
             db.query(Report)
+            .options(selectinload(Report.doctor), selectinload(Report.patient))
             .filter(Report.doctor_id == current_user.id)
             .order_by(Report.created_at.desc())
             .all()
@@ -32,6 +33,7 @@ def get_my_reports(
         # Reports are linked via doctor_id; for now patients see their doctor's run reports
         reports = (
             db.query(Report)
+            .options(selectinload(Report.doctor), selectinload(Report.patient))
             .filter(Report.doctor_id == current_user.id)
             .order_by(Report.created_at.desc())
             .all()

@@ -11,6 +11,8 @@ from app.models.report import Report
 from app.models.user import User
 from app.dependencies import get_current_user
 from app.utils.patient import resolve_or_create_patient_id
+from fastapi.concurrency import run_in_threadpool
+import aiofiles
 
 router = APIRouter()
 
@@ -30,13 +32,17 @@ async def analyze_xray(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
+    # Admin role guard — must fire before any I/O to avoid leaking a 500
+    if current_user.role == "admin":
+        raise HTTPException(status_code=403, detail="Admins should not perform diagnostic analysis")
+
     try:
         # 1. Validate and save file securely
-        file_path = validate_and_save_upload(file, is_xray=True)
+        file_path = await run_in_threadpool(validate_and_save_upload, file, True)
 
         # 2. Read the file
-        with open(file_path, "rb") as f:
-            contents = f.read()
+        async with aiofiles.open(file_path, "rb") as f:
+            contents = await f.read()
 
         # 3. Run AI inference synchronously (model is cached after first load)
         result = await xray_service.predict_xray(contents, xray_type)
@@ -58,22 +64,26 @@ async def analyze_xray(
                 detail="Doctor must provide patient details before analysis"
             )
 
-        resolved_patient_id = resolve_or_create_patient_id(
-            db,
-            patient_id=patient_id,
-            patient_details=patient_details if has_patient_names else None,
-        )
-        new_report = Report(
-            patient_id=resolved_patient_id,
-            doctor_id=current_user.id,
-            report_type="xray",
-            file_path=file_path,
-            status="completed",
-            result_data=result
-        )
-        db.add(new_report)
-        db.commit()
-        db.refresh(new_report)
+        def _save_report():
+            resolved_patient_id = resolve_or_create_patient_id(
+                db,
+                patient_id=patient_id,
+                patient_details=patient_details if has_patient_names else None,
+            )
+            new_report = Report(
+                patient_id=resolved_patient_id,
+                doctor_id=current_user.id,
+                report_type="xray",
+                file_path=file_path,
+                status="completed",
+                result_data=result
+            )
+            db.add(new_report)
+            db.commit()
+            db.refresh(new_report)
+            return new_report
+            
+        await run_in_threadpool(_save_report)
 
         # 5. Return the full result directly (no polling needed)
         return result

@@ -16,9 +16,26 @@ os.environ["ALLOWED_HOSTS"] = "testserver,localhost,127.0.0.1"
 # Disable rate limiting in tests
 os.environ["RATELIMIT_ENABLED"] = "false"
 
+# Ensure required Settings fields are present so Pydantic doesn't raise on import
+os.environ.setdefault("ADMIN_REGISTRATION_KEY", "test-admin-key")
+os.environ.setdefault("JWT_SECRET_KEY", "test-jwt-secret-key-for-testing-only")
+os.environ.setdefault("GEMINI_API_KEY", "fake-gemini-key")
+
 # Mock celery so tests don't require celery/redis to be installed or running.
 mock_celery_module = MagicMock()
 sys.modules["celery"] = mock_celery_module
+
+# Mock redis.asyncio so the health endpoint doesn't need a real Redis server.
+from unittest.mock import AsyncMock, patch as _patch
+_mock_redis_instance = MagicMock()
+_mock_redis_instance.ping = AsyncMock(return_value=True)
+_mock_redis_instance.close = AsyncMock()
+_redis_patcher = _patch("app.main.aioredis.from_url", return_value=_mock_redis_instance)
+_redis_patcher.start()
+
+# Mock xray_service._MODEL so health endpoint reports model as "loaded"
+_model_patcher = _patch("app.services.xray_service._MODEL", new=MagicMock())
+_model_patcher.start()
 
 import pytest
 from fastapi.testclient import TestClient

@@ -21,6 +21,7 @@ frontend/build/
 
 # IDE
 .idea/
+.vscode/
 
 # Logs
 *.log
@@ -29,6 +30,13 @@ npm-debug.log*
 # SQLite databases
 *.db
 *.sqlite3
+
+# Test artifacts
+.pytest_cache/
+tests/test_assets/
+**/test_output.txt
+htmlcov/
+.coverage
 
 # Study / personal guides
 TEAM_GUIDE.md
