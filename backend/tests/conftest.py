@@ -25,19 +25,23 @@ os.environ.setdefault("GEMINI_API_KEY", "fake-gemini-key")
 mock_celery_module = MagicMock()
 sys.modules["celery"] = mock_celery_module
 
-# Mock redis.asyncio so the health endpoint doesn't need a real Redis server.
-from unittest.mock import AsyncMock, patch as _patch
-_mock_redis_instance = MagicMock()
-_mock_redis_instance.ping = AsyncMock(return_value=True)
-_mock_redis_instance.close = AsyncMock()
-_redis_patcher = _patch("app.main.aioredis.from_url", return_value=_mock_redis_instance)
-_redis_patcher.start()
-
-# Mock xray_service._MODEL so health endpoint reports model as "loaded"
-_model_patcher = _patch("app.services.xray_service._MODEL", new=MagicMock())
-_model_patcher.start()
-
 import pytest
+from unittest.mock import MagicMock, AsyncMock, patch
+
+# Mock redis.asyncio so the health endpoint doesn't need a real Redis server.
+# Using a session fixture avoids resolve_name issues during test collection.
+@pytest.fixture(scope="session", autouse=True)
+def mock_external_services():
+    """Globally mock Redis and ML models for all tests."""
+    mock_redis_instance = MagicMock()
+    mock_redis_instance.ping = AsyncMock(return_value=True)
+    mock_redis_instance.close = AsyncMock()
+    
+    # We patch redis.asyncio.from_url directly which is the most robust target
+    with patch("redis.asyncio.from_url", return_value=mock_redis_instance), \
+         patch("app.services.xray_service._MODEL", new=MagicMock()):
+        yield
+
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker
