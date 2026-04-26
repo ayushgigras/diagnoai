@@ -1,10 +1,8 @@
-# Use official python slim image
 FROM python:3.11-slim
 
-# Install system dependencies, including Tesseract, and gcc for building packages
 RUN apt-get update && apt-get install -y \
     tesseract-ocr \
-    libgl1-mesa-glx \
+    libgl1 \
     libglib2.0-0 \
     gcc \
     redis-server \
@@ -12,25 +10,18 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /app
 
-# Copy requirements limits scope for caching
 COPY requirements.txt .
-
-# Install dependencies explicitly bypassing cache for PyTorch to avoid massive layers
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy application code
 COPY . .
 
-# Set environment
 ENV PYTHONPATH=/app
 ENV APP_ENV=production
 
-# Create a non-root user and switch to it
 RUN adduser --disabled-password --gecos '' appuser && \
     mkdir -p /app/uploads && \
     chown -R appuser:appuser /app
 
 USER appuser
 
-# Run the startup script
 CMD ["bash", "render_start.sh"]
