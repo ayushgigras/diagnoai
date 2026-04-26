@@ -11,7 +11,7 @@ export default function NotificationsHelper() {
     if (!isAuthenticated || !token) return;
 
     // Hardcode backend port since Vite proxies might not support standard WS setup seamlessly in basic configs
-    const wsUrl = `ws://127.0.0.1:8000/api/ws/notifications?token=${token}`;
+    const wsUrl = `wss://diagnoai.app/api/ws/notifications?token=${token}`;
     
     const ws = new WebSocket(wsUrl);
 
