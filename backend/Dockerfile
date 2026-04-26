@@ -7,6 +7,7 @@ RUN apt-get update && apt-get install -y \
     libgl1-mesa-glx \
     libglib2.0-0 \
     gcc \
+    redis-server \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -31,5 +32,5 @@ RUN adduser --disabled-password --gecos '' appuser && \
 
 USER appuser
 
-# Run FastAPI app with gunicorn
-CMD ["gunicorn", "app.main:app", "-w", "4", "-k", "uvicorn.workers.UvicornWorker", "--bind", "0.0.0.0:8000"]
+# Run the startup script
+CMD ["bash", "render_start.sh"]
