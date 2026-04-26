@@ -100,7 +100,7 @@ async def csrf_middleware(request: Request, call_next):
             value=secrets.token_urlsafe(32),
             httponly=False,
             samesite="lax",
-            secure=settings.APP_ENV == "production"
+            secure=False
         )
     return response
 
