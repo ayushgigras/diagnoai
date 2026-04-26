@@ -1,8 +1,9 @@
 services:
   - type: web
     name: diagnoai-api
-    env: docker
+    runtime: docker
     dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
     region: ohio
     plan: free
     healthCheckPath: /api/health
@@ -29,12 +30,10 @@ services:
         sync: false
       - key: SENTRY_DSN
         sync: false
-    startCommand: "bash /app/render_start.sh"
 
   - type: web
     name: diagnoai-frontend
-    runtime: static 
-    region: ohio
+    runtime: static
     plan: free
     buildCommand: "cd frontend && npm install && npm run build"
     staticPublishPath: frontend/dist
