@@ -1,6 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
 
 // Mock the API service so no real HTTP calls are made in tests
 vi.mock('../services/api', () => ({
