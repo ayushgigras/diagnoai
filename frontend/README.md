@@ -1,23 +1,24 @@
 # DiagnoAI Frontend
 
-Modern React application for the DiagnoAI healthcare platform.
+Modern React application for the DiagnoAI healthcare platform — live at [https://diagnoai.app](https://diagnoai.app)
 
 ## Features
 
-- **X-Ray Analysis Interface**: Drag & drop upload with synchronous analysis and explainable results.
-- **Lab Analysis Interface**: 
-   - Manual parameter entry
-   - PDF/Image upload with Gemini OCR extraction
-    - Review and edit extracted data
-- **History View**: Shows report status and summarized result previews.
+- **X-Ray Analysis Interface**: Drag & drop upload with synchronous analysis, confidence scores, Grad-CAM heatmap, and XAI explainability cards.
+- **Lab Analysis Interface**:
+  - Manual parameter entry
+  - PDF/Image upload with Gemini 2.5 Flash OCR extraction
+  - Review and edit extracted data
+- **Medical Chatbot**: Floating AI assistant widget powered by Gemini, context-aware of the active report.
+- **History View**: Shows report status and summarized result previews with PDF download.
 - **Modern UI**: Built with Tailwind CSS and Framer Motion.
 
 ## Role-Based Access Control (RBAC)
 
-Access to frontend features is controlled by the user's role:
-- **Admin/Doctor**: Can see and access all tabs including X-Ray Analysis, Lab Analysis, and History.
-- **Patient**: Cannot see or access the X-Ray Analysis feature. Limited to Lab Analysis and History. 
-  *(New user registrations default to the patient role)*
+- **Admin/Doctor**: Full access — X-Ray Analysis, Lab Analysis, History, Admin Panel.
+- **Patient**: Limited to Lab Analysis and History. X-Ray Analysis is restricted.
+
+New registrations default to the `patient` role.
 
 ## Tech Stack
 
@@ -27,8 +28,9 @@ Access to frontend features is controlled by the user's role:
 - Tailwind CSS
 - Framer Motion
 - React Router DOM
-- Zustand (Store)
+- Zustand (State Management)
 - Lucide React (Icons)
+- Axios (API calls)
 
 ## Setup
 
@@ -37,13 +39,20 @@ Access to frontend features is controlled by the user's role:
    npm install
    ```
 
-2. **Run Development Server**
+2. **Environment Variables** (optional)
+   ```env
+   VITE_API_URL=http://localhost:8000/api
+   VITE_WS_URL=ws://localhost:8000/api/ws
+   VITE_GOOGLE_CLIENT_ID=<YOUR_GOOGLE_OAUTH_CLIENT_ID>
+   ```
+
+3. **Run Development Server**
    ```bash
    npm run dev
    ```
    Access at `http://localhost:5173`
 
-3. **Build for Production**
+4. **Build for Production**
    ```bash
    npm run build
    ```
@@ -54,10 +63,14 @@ Access to frontend features is controlled by the user's role:
 npm test
 ```
 
-Runs the Vitest test suite. Tests cover auth store (login, logout, localStorage persistence) and App component rendering.
+Runs the Vitest test suite covering auth store (login, logout, localStorage persistence) and App component rendering.
 
-## Configuration
+## Production Configuration
 
-- API base URL is configured in `src/services/api.ts`.
-- Default backend URL: `http://127.0.0.1:8000/api`.
-- Ensure backend API and Celery worker are running before using analysis pages.
+For production, set in `frontend/.env.production`:
+
+```env
+VITE_API_URL=https://diagnoai.app/api
+VITE_WS_URL=wss://diagnoai.app/api/ws
+VITE_GOOGLE_CLIENT_ID=<YOUR_GOOGLE_OAUTH_CLIENT_ID>
+```
