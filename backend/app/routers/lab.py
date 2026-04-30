@@ -1,3 +1,11 @@
+"""Lab analysis API routes.
+
+This router exposes endpoints for manual lab interpretation, file upload
+based OCR extraction, and background analysis of uploaded reports. The
+endpoints rely on the lab and OCR services for business logic and only
+handle request validation, authorization, and persistence orchestration.
+"""
+
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Body, Depends, Request
 from sqlalchemy.orm import Session
 from slowapi import Limiter
@@ -26,11 +34,16 @@ async def analyze_manual(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """
-    Expects JSON:
-    {
-        "values": { "wbc": 7000, ... }
-    }
+    """Analyze manually entered lab values and persist the result.
+
+    Expects JSON payloads in the form::
+
+        {
+            "values": { "wbc": 7000, ... }
+        }
+
+    The endpoint validates required patient context for doctors, calls the
+    lab analysis service, and stores a completed report for history.
     """
     values = data.get("values", {})
     
@@ -79,6 +92,11 @@ async def upload_lab_file(
     file: UploadFile = File(...),
     current_user: User = Depends(get_current_user)
 ):
+    """Upload a lab report file and extract structured values from it.
+
+    The file is validated and stored securely before being passed to the
+    OCR service for Gemini Vision extraction with fallback handling.
+    """
     try:
         # 1. Validate and save file securely
         file_path = await run_in_threadpool(validate_and_save_upload, file, False)
@@ -109,6 +127,12 @@ async def analyze_from_file(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
+    """Upload a lab report file, create a report record, and enqueue analysis.
+
+    The endpoint persists a pending report, dispatches a Celery task to
+    process the file asynchronously, then stores the generated task ID on
+    the report for later status tracking.
+    """
     try:
         # 1. Validate and save file securely
         file_path = await run_in_threadpool(validate_and_save_upload, file, False)
