@@ -1,5 +1,44 @@
+"""Lab analysis service.
+
+This module provides a lightweight wrapper around an LLM-based clinical
+interpretation workflow. It converts raw extracted laboratory parameter
+lists into a normalized parameter structure, calls the configured
+Gemini model to produce an overall assessment, human-friendly
+interpretation and short recommendations, then merges the model's
+per-parameter statuses back into the output structure.
+
+Functions
+---------
+analyze_lab_values(values: list) -> dict
+    Accepts a list of parameter dictionaries (or a dict fallback) and
+    returns a structured analysis containing `assessment`, `confidence`,
+    `parameters`, `interpretation`, and `recommendations`.
+"""
+
+
 def analyze_lab_values(values: list):
-    """Analyzes a dynamic list of lab parameters using Gemini."""
+    """Analyze laboratory parameters and return an interpretation.
+
+    Parameters
+    ----------
+    values:
+        A list of dicts where each dict represents an extracted lab
+        parameter with keys like `parameter_name`, `result_value`,
+        `unit`, `reference_range` and optional `flag`. The function also
+        accepts an older dict-style mapping (parameter_name -> value)
+        and will normalize it to the expected list form.
+
+    Returns
+    -------
+    dict
+        A dictionary containing:
+        - `assessment`: overall assessment string (Normal/Abnormal/etc.)
+        - `confidence`: numeric confidence estimate
+        - `parameters`: the normalized list of parameters with `status`
+          and `percentage` fields filled in
+        - `interpretation`: a short plain-language interpretation
+        - `recommendations`: list of short actionable recommendations
+    """
     
     import os
     import json

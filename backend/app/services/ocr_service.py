@@ -1,3 +1,24 @@
+"""OCR service utilities.
+
+This module provides helpers to determine file MIME types, extract
+structured laboratory parameters from images or PDFs using Gemini
+Vision, and a local regex-based fallback parser that can extract
+common lab values from Tesseract/OCR output.
+
+Public functions
+----------------
+determine_mime_type(file_name: str) -> str
+    Return a best-effort MIME type for a given filename extension.
+
+extract_lab_values_from_file(file: bytes, file_name: str) -> dict
+    Async function that attempts Gemini Vision extraction and
+    falls back to Tesseract+regex parsing on API errors.
+
+parse_lab_text(text: str) -> dict
+    Parse unstructured OCR text into a mapping of known lab
+    parameters to numeric values (when possible).
+"""
+
 import os
 import re
 import json
@@ -31,6 +52,20 @@ def determine_mime_type(file_name: str) -> str:
 async def extract_lab_values_from_file(file: bytes, file_name: str):
     """
     Extracts structured lab parameters, values, units, and reference ranges directly from an image/PDF using Gemini Vision.
+
+    Parameters
+    ----------
+    file:
+        Raw file bytes of the uploaded document.
+    file_name:
+        Original filename; used to infer MIME type and processing path.
+
+    Returns
+    -------
+    dict
+        A dictionary with keys `extracted_data`, `confidence`, `ocr_text`,
+        and `status`. On success `status` == "success" and
+        `extracted_data` is a list of parameter dicts.
     """
     try:
         api_key = os.getenv("GEMINI_API_KEY")
@@ -187,6 +222,16 @@ async def extract_lab_values_from_file(file: bytes, file_name: str):
 def parse_lab_text(text: str) -> dict:
     """
     Parses unstructured OCR text to find key-value pairs for all known lab tests.
+
+    Parameters
+    ----------
+    text:
+        Raw OCR-extracted text from a lab report image or PDF.
+
+    Returns
+    -------
+    dict
+        Mapping of parameter short-names to numeric values when found.
     """
     data = {}
     text_lower = text.lower()
