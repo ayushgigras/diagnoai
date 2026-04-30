@@ -1,6 +1,9 @@
 """Tests for security features: headers, CORS, rate limiting, endpoint protection."""
 import pytest
+from fastapi.testclient import TestClient
 from unittest.mock import patch, MagicMock, AsyncMock
+
+from app.main import app
 
 
 class TestSecurityHeaders:
@@ -18,6 +21,19 @@ class TestSecurityHeaders:
         resp = client.get("/")
         csp = resp.headers.get("Content-Security-Policy", "")
         assert "default-src" in csp
+
+    def test_csrf_token_set_on_get_request(self):
+        """GET requests should set CSRF cookie when client has no csrf_token cookie."""
+        raw_client = TestClient(app)
+        resp = raw_client.get("/")
+        assert resp.status_code == 200
+        assert "csrf_token" in raw_client.cookies
+
+    def test_permissions_policy_header_present(self, client):
+        """Permissions-Policy header should always be present on responses."""
+        resp = client.get("/api/health")
+        assert "Permissions-Policy" in resp.headers
+        assert "camera=()" in resp.headers["Permissions-Policy"]
 
 
 class TestEndpointProtection:
@@ -42,6 +58,11 @@ class TestEndpointProtection:
     def test_task_status_requires_auth(self, client):
         resp = client.get("/api/tasks/status/fake-task-id")
         assert resp.status_code == 401
+
+    def test_admin_endpoint_requires_admin_role(self, client, auth_headers):
+        """Non-admin authenticated users must not access admin endpoints."""
+        resp = client.get("/api/admin/users", headers=auth_headers)
+        assert resp.status_code == 403
 
 
 class TestPublicEndpoints:
