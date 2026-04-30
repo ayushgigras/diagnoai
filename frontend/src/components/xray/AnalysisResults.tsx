@@ -9,6 +9,7 @@ import {
 import FeedbackForm from '../common/FeedbackForm';
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, Tooltip as RechartsTooltip } from 'recharts';
 import useChatStore from '../../store/useChatStore';
+import XAIMetricsPanel from './XAIMetricsPanel';
 
 interface AnalysisResultsProps {
     result: XRayResult;
@@ -367,8 +368,13 @@ const AnalysisResults = ({ result, imagePreview }: AnalysisResultsProps) => {
                         </div>
                     </div>
                     <p className="text-sm text-slate-500 mb-5 pl-[52px]">
-                        Each card explains what the AI detected, where it focused, and the clinical interpretation. Click to expand.
+                        Review the generated XAI metrics and diagnostic reasoning below.
                     </p>
+                    
+                    <div className="pl-[52px] mb-6">
+                        <XAIMetricsPanel xaiDetails={result.xai_details} />
+                    </div>
+
                     <div className="space-y-4">
                         {xaiEntries.map(([condition, detail], index) => (
                             <XAICard
