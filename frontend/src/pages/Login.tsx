@@ -127,7 +127,7 @@ const Login = () => {
                                 <p className="text-sm text-slate-500">Signing in with Google...</p>
                             ) : (
                                 <GoogleLogin
-                                    onSuccess={(credentialResponse) => {
+                                    onSuccess={(credentialResponse: any) => {
                                         if (credentialResponse.credential) {
                                             handleGoogleLogin(credentialResponse.credential);
                                         } else {
