@@ -9,6 +9,7 @@ export default defineConfig({
     globals: true,
     environment: 'jsdom',
     setupFiles: './src/setupTests.ts',
+    pool: 'forks',
     env: {
       VITE_API_URL: 'http://localhost:8000/api',
       VITE_GOOGLE_CLIENT_ID: 'fake-google-client-id-for-tests',
