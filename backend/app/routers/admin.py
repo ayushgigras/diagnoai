@@ -16,6 +16,9 @@ from pydantic import BaseModel
 class RoleUpdate(BaseModel):
     role: str
 
+class StatusUpdate(BaseModel):
+    is_active: bool
+
 # --- User Management ---
 
 @router.get("/users", response_model=List[UserResponse])
@@ -63,6 +66,25 @@ def update_user_role(
     user.role = role
     db.commit()
     return {"message": f"User role updated to {role}"}
+
+@router.patch("/users/{user_id}/status")
+def update_user_status(
+    user_id: int,
+    status_update: StatusUpdate,
+    db: Session = Depends(get_db),
+    admin: User = Depends(get_current_admin)
+):
+    """Update a user's active status."""
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    if user.id == admin.id and not status_update.is_active:
+        raise HTTPException(status_code=400, detail="Cannot deactivate your own admin account")
+        
+    user.is_active = status_update.is_active
+    db.commit()
+    return {"message": f"User status updated to {'active' if status_update.is_active else 'inactive'}"}
 
 @router.patch("/users/{user_id}", response_model=UserResponse)
 def update_user_details(
