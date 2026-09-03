@@ -1,16 +1,22 @@
-from contextlib import asynccontextmanager
+import os
 import sys
+import secrets
+import importlib
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, Request, Response, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
+from starlette.middleware.trustedhost import TrustedHostMiddleware
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
-from starlette.middleware.trustedhost import TrustedHostMiddleware
-from fastapi.staticfiles import StaticFiles
-import os
-import secrets
+from sqlalchemy import text
+from sqlalchemy.orm import Session
 
 from app.config import settings
+from app.database import get_db
 from app.routers import xray, lab, auth, tasks, reports, ws, admin, feedback, chatbot
 
 # --------------- Rate Limiter ---------------
@@ -29,16 +35,19 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         import logging
         logging.error(f"CRITICAL ERROR: Failed to load DenseNet model: {e}")
-        # Graceful degradation instead of sys.exit(1)
     yield
 
+# Optional Sentry error monitoring (dynamically imported if configured)
 sentry_dsn = os.getenv("SENTRY_DSN")
 if sentry_dsn:
-    import sentry_sdk
-    sentry_sdk.init(
-        dsn=sentry_dsn,
-        traces_sample_rate=1.0,
-    )
+    try:
+        sentry_sdk = importlib.import_module("sentry_sdk")
+        sentry_sdk.init(
+            dsn=sentry_dsn,
+            traces_sample_rate=1.0,
+        )
+    except Exception:
+        pass
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -47,14 +56,12 @@ app = FastAPI(
     lifespan=lifespan
 )
 
+# Optional Prometheus metrics (dynamically imported if installed)
 try:
-    from prometheus_fastapi_instrumentator import Instrumentator
-    Instrumentator().instrument(app).expose(app, endpoint="/api/metrics")
-except ImportError:
-    print("prometheus_fastapi_instrumentator not installed, skipping metrics endpoint.")
-
-if settings.APP_ENV == "production" and "*" in settings.BACKEND_CORS_ORIGINS:
-    raise RuntimeError("CORS cannot allow wildcard '*' in production.")
+    prom = importlib.import_module("prometheus_fastapi_instrumentator")
+    prom.Instrumentator().instrument(app).expose(app, endpoint="/api/metrics")
+except Exception:
+    pass
 
 app.state.limiter = limiter
 if ratelimit_enabled:
@@ -105,9 +112,14 @@ async def csrf_middleware(request: Request, call_next):
     return response
 
 # --------------- CORS Middleware ---------------
+cors_origins = list(settings.BACKEND_CORS_ORIGINS) if isinstance(settings.BACKEND_CORS_ORIGINS, (list, set)) else [settings.BACKEND_CORS_ORIGINS]
+for domain in ["https://diagnoai.app", "https://www.diagnoai.app", "http://localhost:5173", "http://localhost:3000"]:
+    if domain not in cors_origins:
+        cors_origins.append(domain)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.BACKEND_CORS_ORIGINS,
+    allow_origins=cors_origins,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type", "X-CSRF-Token"],
@@ -115,9 +127,18 @@ app.add_middleware(
 )
 
 # --------------- Trusted Host Middleware ---------------
+raw_hosts = settings.ALLOWED_HOSTS if isinstance(settings.ALLOWED_HOSTS, list) else [str(settings.ALLOWED_HOSTS)]
+allowed_hosts = [h.strip() for h in raw_hosts if h.strip()]
+if not allowed_hosts or "*" in allowed_hosts:
+    allowed_hosts = ["*"]
+else:
+    if not any(".herokuapp.com" in h for h in allowed_hosts):
+        allowed_hosts.append("*.herokuapp.com")
+        allowed_hosts.append(".herokuapp.com")
+
 app.add_middleware(
     TrustedHostMiddleware,
-    allowed_hosts=settings.ALLOWED_HOSTS,
+    allowed_hosts=allowed_hosts,
 )
 
 # --------------- Routers ---------------
@@ -128,21 +149,14 @@ app.include_router(tasks.router, prefix="/api/tasks", tags=["Background Tasks"])
 app.include_router(reports.router, prefix="/api/reports", tags=["Reports"])
 app.include_router(ws.router, prefix="/api", tags=["WebSockets"])
 app.include_router(admin.router, prefix="/api/admin", tags=["Admin"])
-app.include_router(feedback.router, prefix="/api", tags=["Feedback"])
+app.include_router(feedback.router, prefix="/api/feedback", tags=["Feedback"])
 app.include_router(chatbot.router, prefix="/api/chatbot", tags=["Chatbot"])
 
-# --------------- Static Files ---------------
+# --------------- Uploads Directory ---------------
 UPLOAD_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "uploads")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
-
-
-from sqlalchemy import text
-from app.database import get_db
-from sqlalchemy.orm import Session
-import redis.asyncio as aioredis
-from fastapi.responses import FileResponse
-
+# --------------- Health Check Endpoint ---------------
 @app.get("/api/health")
 @limiter.limit("10/minute")
 async def health_check(request: Request, db: Session = Depends(get_db)):
@@ -158,12 +172,13 @@ async def health_check(request: Request, db: Session = Depends(get_db)):
     try:
         db.execute(text("SELECT 1"))
         health_status["database"] = "connected"
-    except Exception as e:
+    except Exception:
         health_status["database"] = "failed"
         health_status["status"] = "unhealthy"
 
     # Check Redis
     try:
+        aioredis = importlib.import_module("redis.asyncio")
         redis_kwargs = {}
         if settings.CELERY_BROKER_URL.startswith("rediss://"):
             redis_kwargs["ssl_cert_reqs"] = None
@@ -171,7 +186,7 @@ async def health_check(request: Request, db: Session = Depends(get_db)):
         await redis_client.ping()
         health_status["redis"] = "connected"
         await redis_client.close()
-    except Exception as e:
+    except Exception:
         health_status["redis"] = "failed"
         health_status["status"] = "unhealthy"
 
@@ -197,7 +212,6 @@ if os.path.exists(FRONTEND_DIST):
 
     @app.get("/{full_path:path}")
     async def serve_spa(full_path: str):
-        # Don't intercept API or docs routes
         if full_path.startswith("api") or full_path.startswith("docs") or full_path.startswith("openapi.json"):
             return Response("Not Found", status_code=404)
         file_path = os.path.join(FRONTEND_DIST, full_path)
