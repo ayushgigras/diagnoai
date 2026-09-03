@@ -80,12 +80,13 @@ async def add_security_headers(request: Request, call_next):
     response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
     response.headers["X-Permitted-Cross-Domain-Policies"] = "none"
     response.headers["Content-Security-Policy"] = (
-        "default-src 'self'; "
-        "script-src 'self'; "
+        "default-src 'self' https:; "
+        "script-src 'self' 'unsafe-inline' https://accounts.google.com https://apis.google.com; "
         "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
         "font-src 'self' https://fonts.gstatic.com; "
-        "img-src 'self' data: blob:; "
-        "connect-src 'self'; "
+        "img-src 'self' data: blob: https:; "
+        "connect-src 'self' https://*.herokuapp.com https://diagnoai.app https://*.diagnoai.app https://*.vercel.app wss://*.herokuapp.com wss://*.diagnoai.app https://accounts.google.com https://*.google.com; "
+        "frame-src 'self' https://accounts.google.com; "
         "frame-ancestors 'none';"
     )
     return response
@@ -121,11 +122,11 @@ for domain in ["https://diagnoai.app", "https://www.diagnoai.app", "http://local
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=cors_origins if "*" not in cors_origins else ["*"],
-    allow_origin_regex=r"https://.*\.vercel\.app" if "*" not in cors_origins else None,
+    allow_origins=cors_origins,
+    allow_origin_regex=r"https?://.*",
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-    allow_headers=["Authorization", "Content-Type", "X-CSRF-Token"],
+    allow_headers=["Authorization", "Content-Type", "X-CSRF-Token", "X-Requested-With", "Accept", "Origin"],
     expose_headers=["X-CSRF-Token"],
 )
 
