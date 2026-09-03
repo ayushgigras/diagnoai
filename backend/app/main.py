@@ -14,6 +14,7 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from sqlalchemy import text
 from sqlalchemy.orm import Session
+import redis.asyncio as aioredis
 
 from app.config import settings
 from app.database import get_db
@@ -149,7 +150,7 @@ app.include_router(tasks.router, prefix="/api/tasks", tags=["Background Tasks"])
 app.include_router(reports.router, prefix="/api/reports", tags=["Reports"])
 app.include_router(ws.router, prefix="/api", tags=["WebSockets"])
 app.include_router(admin.router, prefix="/api/admin", tags=["Admin"])
-app.include_router(feedback.router, prefix="/api/feedback", tags=["Feedback"])
+app.include_router(feedback.router, prefix="/api", tags=["Feedback"])
 app.include_router(chatbot.router, prefix="/api/chatbot", tags=["Chatbot"])
 
 # --------------- Uploads Directory ---------------
@@ -178,7 +179,6 @@ async def health_check(request: Request, db: Session = Depends(get_db)):
 
     # Check Redis
     try:
-        aioredis = importlib.import_module("redis.asyncio")
         redis_kwargs = {}
         if settings.CELERY_BROKER_URL.startswith("rediss://"):
             redis_kwargs["ssl_cert_reqs"] = None
