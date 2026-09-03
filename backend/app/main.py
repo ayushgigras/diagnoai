@@ -115,7 +115,8 @@ async def csrf_middleware(request: Request, call_next):
     return response
 
 # --------------- CORS Middleware ---------------
-cors_origins = list(settings.BACKEND_CORS_ORIGINS) if isinstance(settings.BACKEND_CORS_ORIGINS, (list, set)) else [settings.BACKEND_CORS_ORIGINS]
+raw_cors = list(settings.BACKEND_CORS_ORIGINS) if isinstance(settings.BACKEND_CORS_ORIGINS, (list, set)) else [str(settings.BACKEND_CORS_ORIGINS)]
+cors_origins = [o.strip() for o in raw_cors if o and o.strip() not in ["*", "['*']", '["*"]']]
 for domain in ["https://diagnoai.app", "https://www.diagnoai.app", "http://localhost:5173", "http://localhost:3000"]:
     if domain not in cors_origins:
         cors_origins.append(domain)
@@ -123,7 +124,7 @@ for domain in ["https://diagnoai.app", "https://www.diagnoai.app", "http://local
 app.add_middleware(
     CORSMiddleware,
     allow_origins=cors_origins,
-    allow_origin_regex=r"https?://.*",
+    allow_origin_regex=r"^https?:\/\/.*$",
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type", "X-CSRF-Token", "X-Requested-With", "Accept", "Origin"],
@@ -131,18 +132,9 @@ app.add_middleware(
 )
 
 # --------------- Trusted Host Middleware ---------------
-raw_hosts = settings.ALLOWED_HOSTS if isinstance(settings.ALLOWED_HOSTS, list) else [str(settings.ALLOWED_HOSTS)]
-allowed_hosts = [h.strip() for h in raw_hosts if h.strip()]
-if not allowed_hosts or "*" in allowed_hosts:
-    allowed_hosts = ["*"]
-else:
-    if not any(".herokuapp.com" in h for h in allowed_hosts):
-        allowed_hosts.append("*.herokuapp.com")
-        allowed_hosts.append(".herokuapp.com")
-
 app.add_middleware(
     TrustedHostMiddleware,
-    allowed_hosts=allowed_hosts,
+    allowed_hosts=["*"],
 )
 
 # --------------- Routers ---------------
