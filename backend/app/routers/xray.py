@@ -32,10 +32,6 @@ async def analyze_xray(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    # Admin role guard — must fire before any I/O to avoid leaking a 500
-    if current_user.role == "admin":
-        raise HTTPException(status_code=403, detail="Admins should not perform diagnostic analysis")
-
     try:
         # 1. Validate and save file securely
         file_path = await run_in_threadpool(validate_and_save_upload, file, True)
