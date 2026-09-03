@@ -93,8 +93,9 @@ async def add_security_headers(request: Request, call_next):
 # --------------- CSRF Middleware ---------------
 @app.middleware("http")
 async def csrf_middleware(request: Request, call_next):
-    CSRF_EXEMPT_PATHS = ["/api/auth/login", "/api/auth/register", "/api/auth/forgot-password", "/api/auth/reset-password", "/api/health", "/"]
-    if request.method in ["POST", "PUT", "DELETE", "PATCH"] and request.url.path not in CSRF_EXEMPT_PATHS:
+    CSRF_EXEMPT_PATHS = ["/api/health", "/"]
+    # Exempt all authentication endpoints and exempt paths from CSRF checks
+    if request.method in ["POST", "PUT", "DELETE", "PATCH"] and not request.url.path.startswith("/api/auth") and request.url.path not in CSRF_EXEMPT_PATHS:
         csrf_token = request.headers.get("x-csrf-token")
         cookie_token = request.cookies.get("csrf_token")
         if not csrf_token or not cookie_token or csrf_token != cookie_token:
@@ -120,7 +121,8 @@ for domain in ["https://diagnoai.app", "https://www.diagnoai.app", "http://local
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=cors_origins,
+    allow_origins=cors_origins if "*" not in cors_origins else ["*"],
+    allow_origin_regex=r"https://.*\.vercel\.app" if "*" not in cors_origins else None,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type", "X-CSRF-Token"],
