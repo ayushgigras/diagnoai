@@ -141,6 +141,7 @@ from sqlalchemy import text
 from app.database import get_db
 from sqlalchemy.orm import Session
 import redis.asyncio as aioredis
+from fastapi.responses import FileResponse
 
 @app.get("/api/health")
 @limiter.limit("10/minute")
@@ -163,7 +164,10 @@ async def health_check(request: Request, db: Session = Depends(get_db)):
 
     # Check Redis
     try:
-        redis_client = aioredis.from_url(settings.CELERY_BROKER_URL)
+        redis_kwargs = {}
+        if settings.CELERY_BROKER_URL.startswith("rediss://"):
+            redis_kwargs["ssl_cert_reqs"] = None
+        redis_client = aioredis.from_url(settings.CELERY_BROKER_URL, **redis_kwargs)
         await redis_client.ping()
         health_status["redis"] = "connected"
         await redis_client.close()
@@ -181,6 +185,29 @@ async def health_check(request: Request, db: Session = Depends(get_db)):
 
     return health_status
 
-@app.get("/")
-async def root():
-    return {"message": "Welcome to DiagnoAI API"}
+# Serve frontend build if dist folder exists (supports all-in-one deployment)
+FRONTEND_DIST = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "frontend", "dist"))
+if not os.path.exists(FRONTEND_DIST):
+    FRONTEND_DIST = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "dist"))
+
+if os.path.exists(FRONTEND_DIST):
+    assets_dir = os.path.join(FRONTEND_DIST, "assets")
+    if os.path.exists(assets_dir):
+        app.mount("/assets", StaticFiles(directory=assets_dir), name="assets")
+
+    @app.get("/{full_path:path}")
+    async def serve_spa(full_path: str):
+        # Don't intercept API or docs routes
+        if full_path.startswith("api") or full_path.startswith("docs") or full_path.startswith("openapi.json"):
+            return Response("Not Found", status_code=404)
+        file_path = os.path.join(FRONTEND_DIST, full_path)
+        if full_path and os.path.exists(file_path) and not os.path.isdir(file_path):
+            return FileResponse(file_path)
+        index_file = os.path.join(FRONTEND_DIST, "index.html")
+        if os.path.exists(index_file):
+            return FileResponse(index_file)
+        return {"message": "Welcome to DiagnoAI API"}
+else:
+    @app.get("/")
+    async def root():
+        return {"message": "Welcome to DiagnoAI API"}

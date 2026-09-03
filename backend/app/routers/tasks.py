@@ -12,19 +12,22 @@ async def get_task_status(
     task_id: str,
     current_user: User = Depends(get_current_user)
 ):
-    """Checks the status of a Celery background task."""
     task_result = celery_app.AsyncResult(task_id)
+    try:
+        task_status = task_result.status
+    except Exception:
+        task_status = "PENDING"
 
     response = {
         "task_id": task_id,
-        "status": task_result.status,
+        "status": task_status,
     }
 
-    if task_result.status == "SUCCESS":
+    if task_status == "SUCCESS":
         response["result"] = task_result.result
-    elif task_result.status == "FAILURE":
+    elif task_status == "FAILURE":
         response["error"] = str(task_result.info)
-    elif task_result.status in {"PENDING", "STARTED", "RETRY"}:
+    elif task_status in {"PENDING", "STARTED", "RETRY"}:
         # Fall back to persisted report status in case result backend is unavailable
         # or has evicted/expired the task metadata.
         db = SessionLocal()

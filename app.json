@@ -1,0 +1,56 @@
+{
+  "name": "DiagnoAI",
+  "description": "AI-Powered Diagnostic System for Medical Imaging and Laboratory Reports",
+  "repository": "https://github.com/ayushgigras/diagnoai",
+  "keywords": [
+    "fastapi",
+    "react",
+    "medical-ai",
+    "densenet",
+    "tesseract",
+    "celery",
+    "pytorch"
+  ],
+  "stack": "container",
+  "addons": [
+    {
+      "plan": "heroku-postgresql:essential-0"
+    },
+    {
+      "plan": "heroku-redis:mini"
+    }
+  ],
+  "env": {
+    "APP_ENV": {
+      "description": "Environment mode",
+      "value": "production"
+    },
+    "JWT_SECRET_KEY": {
+      "description": "Secret key for signing JWT tokens",
+      "generator": "secret"
+    },
+    "ADMIN_REGISTRATION_KEY": {
+      "description": "Secret key to authorize admin account creation",
+      "generator": "secret"
+    },
+    "GEMINI_API_KEY": {
+      "description": "Google Gemini API Key for OCR extraction and diagnostic insights",
+      "required": true
+    },
+    "ALLOWED_HOSTS": {
+      "description": "Comma-separated or wildcard hostnames",
+      "value": ".herokuapp.com,localhost,127.0.0.1",
+      "required": false
+    },
+    "BACKEND_CORS_ORIGINS": {
+      "description": "Allowed origins for CORS (e.g. your frontend Heroku URL or Vercel URL)",
+      "value": "[\"http://localhost:5173\"]",
+      "required": false
+    }
+  },
+  "formation": {
+    "web": {
+      "quantity": 1
+    }
+  }
+}

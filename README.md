@@ -11,7 +11,7 @@
 
 DiagnoAI is a full-stack AI-powered diagnostic system designed to assist healthcare professionals in analyzing medical imaging (X-Rays) and laboratory reports. It ships with two frontends — a **React + Vite SPA** for production use and a **Streamlit** app for rapid prototyping and demos.
 
-📖 **Docs:** [API Reference](./docs/API.md) · [Deployment Guide](./docs/DEPLOYMENT.md) · [Contributing](./CONTRIBUTING.md)
+📖 **Docs:** [API Reference](./docs/API.md) · [Production Deployment](./docs/DEPLOYMENT.md) · [Heroku Deployment](./docs/HEROKU_DEPLOYMENT.md) · [Contributing](./CONTRIBUTING.md)
 
 ## Features
 
@@ -162,26 +162,39 @@ VITE_API_URL=http://localhost:8000/api
 
 Client runs at `http://localhost:5173`.
 
-## 🚀 Production Deployment
+## 🚀 Deployment (Heroku)
 
-DiagnoAI is deployed on **Azure VM (Ubuntu 22.04)** using Docker + Nginx.
+DiagnoAI is optimized for deployment on **Heroku** using the Container (Docker) stack, Heroku PostgreSQL, and Heroku Data for Redis.
 
-**Live at:** [https://diagnoai.app](https://diagnoai.app)
+📖 **Step-by-Step Guide:** [docs/HEROKU_DEPLOYMENT.md](./docs/HEROKU_DEPLOYMENT.md)
 
-### Infrastructure
-- **VM:** Azure Standard B2s (2 vCPU, 4GB RAM)
-- **Reverse Proxy:** Nginx with SSL (Let's Encrypt)
-- **Database:** PostgreSQL 15 (Docker)
-- **Cache/Queue:** Redis 7 (Docker)
-- **Email:** Resend SMTP (`noreply@diagnoai.app`)
-
-### Deploy
+### Quick Deploy via Heroku CLI
 
 ```bash
-docker compose -f docker-compose.prod.yml up -d --build
+# 1. Create app and add-ons
+heroku create diagnoai-api
+heroku addons:create heroku-postgresql:essential-0 -a diagnoai-api
+heroku addons:create heroku-redis:mini -a diagnoai-api
+
+# 2. Configure environment variables
+heroku config:set -a diagnoai-api \
+  APP_ENV=production \
+  JWT_SECRET_KEY=$(openssl rand -hex 32) \
+  ADMIN_REGISTRATION_KEY=YourSecureAdminSecretKey \
+  GEMINI_API_KEY="your-gemini-api-key" \
+  ALLOWED_HOSTS=".herokuapp.com,localhost,127.0.0.1" \
+  BACKEND_CORS_ORIGINS='["https://diagnoai-api.herokuapp.com"]'
+
+# 3. Build & push container image
+heroku container:push web --context-path ./backend -a diagnoai-api
+heroku container:release web -a diagnoai-api
+
+# 4. Run migrations
+heroku run alembic upgrade head -a diagnoai-api
 ```
 
-For full deployment guide see [docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md).
+### Frontend Deployment
+Deploy the `frontend/` directory to **Vercel** or **Netlify** with `VITE_API_URL=https://<your-app>.herokuapp.com/api` for fast edge CDN delivery.
 
 ## Testing
 
@@ -189,7 +202,7 @@ For full deployment guide see [docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md).
 
 ```bash
 cd backend
-pytest tests/ -v --ignore=tests/test_api.py
+pytest tests/ -v
 ```
 
 ### Frontend Tests (Vitest)
@@ -205,19 +218,21 @@ npm test
 - WebSocket reconnection is manual (handled by useWebSocket hook)
 - X-Ray model supports chest X-rays only currently
 - Lab report OCR accuracy depends on image quality
-- Hosted on Azure B2s VM — may be slow during peak load (PyTorch on CPU)
 
 ## Changelog
 
+### v1.4.0 (September 2026)
+- ✅ Added complete Heroku deployment support (`heroku.yml`, `Procfile`, `app.json`, `static.json`)
+- ✅ Automated Heroku PostgreSQL `postgres://` to `postgresql://` URI translation
+- ✅ Heroku Data for Redis SSL/TLS support (`rediss://`) with certificate handling
+- ✅ Cleaned up legacy deployment scripts and optimized Docker multi-process startup
+
 ### v1.3.0 (April 2026)
-- ✅ Production deployment on Azure VM (Standard B2s)
-- ✅ Custom domain `diagnoai.app` with SSL (Let's Encrypt)
-- ✅ Email system via Resend (`noreply@diagnoai.app`)
+- ✅ Custom domain `diagnoai.app` with SSL
+- ✅ Email system via Resend
 - ✅ Fixed Alembic migration issues for fresh database deployments
 - ✅ Docker production optimization (single image reuse for API + Celery worker)
 - ✅ CSRF middleware fixes for HTTPS production environment
-- ✅ Added missing user columns migration (phone, bio, location, profile_image_url, specialization)
-- ✅ Added feedback table migration
 - ✅ Gemini model updated to `gemini-2.5-flash`
 
 ### v1.2.0 (April 2026)
@@ -231,15 +246,11 @@ npm test
 - ✅ Resource-level authorization on report history and deletion
 - ✅ Improved CSP security headers
 - ✅ New comprehensive authorization test suite (20+ test cases)
-- ✅ Full API reference documentation (`docs/API.md`)
-- ✅ Production deployment guide (`docs/DEPLOYMENT.md`)
 
 ### v1.0.0 (March 2026)
 - Initial release with X-Ray and Lab analysis
 - JWT authentication, Google OAuth, CSRF protection
 - Role-based access control (patient / doctor / admin)
-- Email verification and password reset flows
-- PDF report generation
 - Celery + Redis background processing
 - WebSocket real-time notifications
 

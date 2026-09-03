@@ -14,7 +14,7 @@ class Settings(BaseSettings):
     
     # Environment API Keys
     GEMINI_API_KEY: str | None = None
-    ADMIN_REGISTRATION_KEY: str
+    ADMIN_REGISTRATION_KEY: str = "diagnoai-admin-key"
     GOOGLE_CLIENT_ID: str | None = None
     FRONTEND_URL: str = "http://localhost:5173"
 
@@ -26,9 +26,9 @@ class Settings(BaseSettings):
     SMTP_SENDER_EMAIL: str | None = None
     SMTP_USE_TLS: bool = True
 
-    # Redis / Celery
-    CELERY_BROKER_URL: str = "redis://127.0.0.1:6379/0"
-    CELERY_RESULT_BACKEND: str = "redis://127.0.0.1:6379/0"
+    # Redis / Celery (Heroku Data for Redis provides REDIS_URL or REDIS_TLS_URL)
+    CELERY_BROKER_URL: str = os.getenv("CELERY_BROKER_URL") or os.getenv("REDIS_URL") or os.getenv("REDIS_TLS_URL") or "redis://127.0.0.1:6379/0"
+    CELERY_RESULT_BACKEND: str = os.getenv("CELERY_RESULT_BACKEND") or os.getenv("REDIS_URL") or os.getenv("REDIS_TLS_URL") or "redis://127.0.0.1:6379/0"
 
     # Upload paths
     UPLOAD_DIR: str = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "temp_uploads")
@@ -37,7 +37,28 @@ class Settings(BaseSettings):
     @classmethod
     def parse_allowed_hosts(cls, v):
         if isinstance(v, str):
-            return [x.strip() for x in v.split(',')]
+            v_trimmed = v.strip()
+            if v_trimmed.startswith('[') and v_trimmed.endswith(']'):
+                import json
+                try:
+                    return json.loads(v_trimmed)
+                except Exception:
+                    pass
+            return [x.strip() for x in v_trimmed.split(',') if x.strip()]
+        return v
+
+    @field_validator('BACKEND_CORS_ORIGINS', mode='before')
+    @classmethod
+    def parse_cors_origins(cls, v):
+        if isinstance(v, str):
+            v_trimmed = v.strip()
+            if v_trimmed.startswith('[') and v_trimmed.endswith(']'):
+                import json
+                try:
+                    return json.loads(v_trimmed)
+                except Exception:
+                    pass
+            return [x.strip() for x in v_trimmed.split(',') if x.strip()]
         return v
 
 settings = Settings()

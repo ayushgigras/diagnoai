@@ -24,4 +24,4 @@ RUN adduser --disabled-password --gecos '' appuser && \
 
 USER appuser
 
-CMD ["bash", "render_start.sh"]
+CMD ["bash", "heroku_start.sh"]
