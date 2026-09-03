@@ -1,3 +1,4 @@
+--extra-index-url https://download.pytorch.org/whl/cpu
 aiofiles==25.1.0
 alembic==1.18.4
 altair==6.0.0
@@ -115,7 +116,6 @@ slowapi==0.1.9
 smmap==5.0.2
 SQLAlchemy==2.0.48
 starlette==0.50.0
-streamlit==1.54.0
 sympy==1.14.0
 tenacity==9.1.4
 threadpoolctl==3.6.0
