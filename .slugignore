@@ -1,0 +1,29 @@
+# Exclude Frontend (deployed to Vercel/Netlify)
+frontend/
+
+# Exclude Tests & Test Assets
+tests/
+backend/tests/
+.pytest_cache/
+
+# Exclude Documentation
+docs/
+*.md
+CONTRIBUTING.md
+README.md
+
+# Exclude CI/CD & IDE configs
+.github/
+.vscode/
+
+# Exclude Docker & Nginx configs not needed in Dyno
+docker-compose*.yml
+nginx/
+render.yaml
+
+# Exclude Streamlit demo script
+streamlit_app.py
+
+# Exclude temporary uploads
+backend/temp_uploads/
+backend/uploads/
