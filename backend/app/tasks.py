@@ -11,7 +11,10 @@ from loguru import logger
 
 def notify_user(doctor_id: int, message_type: str, report_id: int, status: str, details: str = ""):
     try:
-        r = redis.from_url(settings.CELERY_BROKER_URL)
+        redis_kwargs = {}
+        if settings.CELERY_BROKER_URL.startswith("rediss://"):
+            redis_kwargs["ssl_cert_reqs"] = None
+        r = redis.from_url(settings.CELERY_BROKER_URL, **redis_kwargs)
         payload = {
             "type": message_type,
             "report_id": report_id,
